@@ -219,30 +219,30 @@ router.get('/', requireAuth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0
 
   try {
-    const { data, error, count } = await supabase
-      .from('uploads')
-      .select(`
-        id,
-        title,
-        track_type,
-        status,
-        audio_url,
-        audio_features,
-        sentence_prompt,
-        created_at,
-        generations (
-          id,
-          filter_id,
-          variant_selected,
-          image_url,
-          status,
-          created_at
+   // Change this block inside router.get('/', ...)
+      const { data, error, count } = await supabase
+  .from('uploads')
+  .select(`
+    id,
+    title,
+    track_type,
+    status,
+    audio_url,
+    audio_features,
+    sentence_prompt,
+    created_at,
+    generations!upload_id (
+      id,
+      filter_id,
+      variant_selected,
+      image_url,
+      status,
+      created_at
         )
       `, { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
-
     if (error) {
       console.error('Uploads fetch failed:', error.message)
       return res.status(500).json({ error: 'Failed to load uploads.' })
@@ -272,29 +272,28 @@ router.get('/:id', requireAuth, async (req, res) => {
 
   try {
     const { data, error } = await supabase
-      .from('uploads')
-      .select(`
-        id,
-        title,
-        track_type,
-        status,
-        audio_url,
-        audio_features,
-        sentence_prompt,
-        created_at,
-        generations (
-          id,
-          filter_id,
-          variant_selected,
-          image_url,
-          status,
-          steering_params,
-          created_at
-        )
-      `)
-      .eq('id', id)
-      .eq('user_id', userId)
-      .single()
+  .from('uploads')
+  .select(`
+    id,
+    title,
+    track_type,
+    status,
+    audio_url,
+    audio_features,
+    sentence_prompt,
+    created_at,
+    generations!upload_id (
+      id,
+      filter_id,
+      variant_selected,
+      image_url,
+      steering_params,
+      status
+    )
+  `)
+  .eq('id', id)
+  .eq('user_id', userId)
+  .single()
 
     if (error) {
       if (error.code === 'PGRST116') {
