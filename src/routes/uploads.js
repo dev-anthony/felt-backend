@@ -137,14 +137,85 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
  * not just track_type. High speechiness on a "vocal" track confirms Whisper.
  * Low speechiness overrides to Feeling Expander just in case.
  */
+// router.post('/:id/analysis', requireAuth, async (req, res) => {
+//   const { id } = req.params
+//   const userId = req.user.id
+
+//   const {
+//     bpm, key, scale, energy, valence, danceability,
+//     acousticness, spectral_brightness, loudness, mood, speechiness
+//   } = req.body
+
+//   // Basic presence check — all fields expected from Essentia.js
+//   const required = { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood }
+//   const missing = Object.entries(required).filter(([, v]) => v === undefined || v === null).map(([k]) => k)
+
+//   if (missing.length > 0) {
+//     return res.status(400).json({ error: `Missing audio features: ${missing.join(', ')}` })
+//   }
+
+//   try {
+//     // Verify this upload belongs to this user
+//     const { data: existing, error: fetchError } = await supabase
+//       .from('uploads')
+//       .select('id, track_type, status')
+//       .eq('id', id)
+//       .eq('user_id', userId)
+//       .single()
+
+//     if (fetchError || !existing) {
+//       return res.status(404).json({ error: 'Upload not found' })
+//     }
+
+//     if (existing.status !== 'uploaded') {
+//       return res.status(409).json({ error: 'Analysis already submitted for this track' })
+//     }
+
+//     // Save features and advance status
+//     const { data: updated, error: updateError } = await supabase
+//       .from('uploads')
+//       .update({
+//         audio_features: {
+//           bpm, key, scale, energy, valence, danceability,
+//           acousticness, spectral_brightness, loudness, mood,
+//           speechiness: speechiness ?? null,
+//         },
+//         status: 'analyzed',
+//       })
+//       .eq('id', id)
+//       .select()
+//       .single()
+
+//     if (updateError) {
+//       console.error('Analysis save failed:', updateError.message)
+//       return res.status(500).json({ error: 'Failed to save analysis.' })
+//     }
+
+//     // Resolve pipeline based on actual speechiness score
+//     // Threshold: >40 = has vocals, run Whisper. <=40 = treat as instrumental.
+//     const resolvedHint = (speechiness ?? 0) > 40 ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
+
+//     return res.status(200).json({
+//       track: updated,
+//       pipeline_hint: resolvedHint,
+//     })
+
+//   } catch (err) {
+//     console.error('Analysis save error:', err)
+//     return res.status(500).json({ error: 'Something went wrong.' })
+//   }
+// })
 router.post('/:id/analysis', requireAuth, async (req, res) => {
   const { id } = req.params
   const userId = req.user.id
 
+  // Defensive: accept either a flat body or one nested under `features`
+  const payload = req.body.features ?? req.body
+
   const {
     bpm, key, scale, energy, valence, danceability,
     acousticness, spectral_brightness, loudness, mood, speechiness
-  } = req.body
+  } = payload
 
   // Basic presence check — all fields expected from Essentia.js
   const required = { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood }
@@ -191,9 +262,16 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to save analysis.' })
     }
 
-    // Resolve pipeline based on actual speechiness score
-    // Threshold: >40 = has vocals, run Whisper. <=40 = treat as instrumental.
-    const resolvedHint = (speechiness ?? 0) > 40 ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
+    // Resolve pipeline:
+    // - Default to the original track_type intent (vocal -> Whisper, instrumental -> Feeling Expander)
+    // - Speechiness can override: high speechiness on an "instrumental" confirms vocals present,
+    //   low speechiness on a "vocal" track falls back to Feeling Expander.
+    let resolvedHint
+    if (speechiness !== undefined && speechiness !== null) {
+      resolvedHint = speechiness > 40 ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
+    } else {
+      resolvedHint = existing.track_type === 'vocal' ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
+    }
 
     return res.status(200).json({
       track: updated,

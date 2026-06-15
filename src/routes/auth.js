@@ -172,30 +172,90 @@ router.post('/login', async (req, res) => {
  * POST /api/auth/logout
  * Pulls token either from cookies or fallback header
  */
-router.post('/logout', async (req, res) => {
-  // Use cookie-parser fallback or headers extraction
-  const token = req.cookies?.access_token || req.headers.authorization?.split(' ')[1]
+// router.post('/logout', async (req, res) => {
+//   // Use cookie-parser fallback or headers extraction
+//   const token = req.cookies?.access_token || req.headers.authorization?.split(' ')[1]
 
-  if (!token) {
-    return res.status(400).json({ error: 'No active session found' })
+//   if (!token) {
+//     return res.status(400).json({ error: 'No active session found' })
+//   }
+
+//   try {
+//     const { error } = await supabase.auth.admin.signOut(token)
+
+//     if (error) {
+//       return res.status(400).json({ error: error.message })
+//     }
+
+//     // Explicitly wipe cookies on completion
+//     res.clearCookie('access_token', { path: '/' })
+//     res.clearCookie('refresh_token', { path: '/' })
+
+//     return res.status(200).json({ message: 'Logged out' })
+//   } catch (err) {
+//     console.error('Logout error:', err)
+//     return res.status(500).json({ error: 'Something went wrong.' })
+//   }
+// })
+/**
+ * POST /api/auth/logout
+ */
+router.post('/logout', async (req, res) => {
+  const refreshToken = req.cookies?.refresh_token
+
+  try {
+    if (refreshToken) {
+      // Best-effort global signout via Supabase.
+      // If it fails because the token is dead or expired, catch it and move on.
+      await supabase.auth.signOut({ scope: 'global' }).catch((e) => {
+        console.error('Supabase signOut (best-effort) failed:', e.message)
+      })
+    }
+  } catch (err) {
+    console.error('Logout processing error:', err)
+  } finally {
+    // Explicitly wipe the client's HTTP-only session cookies
+    res.clearCookie('access_token', { path: '/' })
+    res.clearCookie('refresh_token', { path: '/' })
+  }
+
+  return res.status(200).json({ message: 'Logged out successfully' })
+})
+
+/**
+ * POST /api/auth/refresh
+ * Uses the HTTP-Only refresh token to mint a fresh access token bundle.
+ */
+router.post('/refresh', async (req, res) => {
+  const refreshToken = req.cookies?.refresh_token
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'No refresh token available' })
   }
 
   try {
-    const { error } = await supabase.auth.admin.signOut(token)
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token: refreshToken,
+    })
 
-    if (error) {
-      return res.status(400).json({ error: error.message })
+    if (error || !data.session) {
+      res.clearCookie('access_token', { path: '/' })
+      res.clearCookie('refresh_token', { path: '/' })
+      return res.status(401).json({ error: 'Session has expired' })
     }
 
-    // Explicitly wipe cookies on completion
-    res.clearCookie('access_token', { path: '/' })
-    res.clearCookie('refresh_token', { path: '/' })
+    // Set updated cookie values
+    res.cookie('access_token', data.session.access_token, COOKIE_OPTIONS)
+    res.cookie('refresh_token', data.session.refresh_token, COOKIE_OPTIONS)
 
-    return res.status(200).json({ message: 'Logged out' })
+    return res.status(200).json({
+      message: 'Token refreshed',
+      expires_in: data.session.expires_in, // E.g., 3600 (seconds)
+      expires_at: data.session.expires_at, // Unix epoch timestamp (seconds)
+    })
   } catch (err) {
-    console.error('Logout error:', err)
-    return res.status(500).json({ error: 'Something went wrong.' })
+    console.error('Token refreshing uncaught error:', err)
+    return res.status(500).json({ error: 'Internal server error during refresh operation' })
   }
 })
-
 module.exports = router

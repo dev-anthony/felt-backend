@@ -7,6 +7,7 @@ const authRoutes = require('./src/routes/auth')
 const onboardingRoutes = require('./src/routes/onboarding')
 const userRoutes = require('./src/routes/user')
 const uploadRoutes = require('./src/routes/uploads')
+const generationRoutes = require('./src/routes/generation')
 
 const app = express()
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/onboarding', onboardingRoutes)
 app.use('/api/user', userRoutes)
 app.use('/api/uploads', uploadRoutes)
+app.use('/api/generations', generationRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'FELT backend is running' })

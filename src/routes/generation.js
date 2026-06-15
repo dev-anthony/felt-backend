@@ -198,15 +198,348 @@ const storeImageInCloudinary = async (imageUrl, trackId, variantIndex) => {
  * and returns a rich sensory brief using Claude Haiku + audio features.
  * Artist sees the result and approves/edits before generation starts.
  */
+// router.post('/expand', requireAuth, async (req, res) => {
+//   const { upload_id, basic_input } = req.body
+//   const userId = req.user.id
+
+//   if (!upload_id || !basic_input?.trim()) {
+//     return res.status(400).json({ error: 'upload_id and basic_input are required' })
+//   }
+
+//   try {
+//     const { data: upload, error: uploadError } = await supabase
+//       .from('uploads')
+//       .select('id, audio_features, track_type')
+//       .eq('id', upload_id)
+//       .eq('user_id', userId)
+//       .single()
+
+//     if (uploadError || !upload) {
+//       return res.status(404).json({ error: 'Upload not found' })
+//     }
+
+//     if (upload.track_type !== 'instrumental') {
+//       return res.status(400).json({ error: 'Feeling Expander is only for instrumental tracks' })
+//     }
+
+//     const features = upload.audio_features || {}
+
+//     const response = await fetch('https://api.anthropic.com/v1/messages', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'x-api-key': process.env.ANTHROPIC_API_KEY,
+//         'anthropic-version': '2023-06-01',
+//       },
+//       body: JSON.stringify({
+//         model: 'claude-haiku-4-5-20251001',
+//         max_tokens: 200,
+//         messages: [{
+//           role: 'user',
+//           content: `A music producer described their beat as: "${basic_input.trim()}"
+
+// Audio emotional data:
+// - Tempo: ${features.bpm ?? 'unknown'} BPM
+// - Mood: ${features.mood ?? 'unknown'}
+// - Energy: ${features.energy ?? 'unknown'}/100
+// - Key: ${features.key ?? 'unknown'} ${features.scale ?? ''}
+// - Valence (emotional positivity): ${features.valence ?? 'unknown'}/100
+// - Acousticness: ${features.acousticness ?? 'unknown'}/100
+
+// Expand this into a rich 2-3 sentence sensory description.
+// Think: time of day, place, atmosphere, physical sensation, human story.
+// Be specific and vivid. No clichés. No genre names.
+// Return only the description, nothing else.`
+//         }]
+//       })
+//     })
+
+//     const claudeData = await response.json()
+
+//     if (!response.ok || !claudeData.content?.[0]?.text) {
+//       console.error('Claude Haiku error:', claudeData)
+//       return res.status(500).json({ error: 'Failed to expand feeling. Please try again.' })
+//     }
+
+//     const expanded = claudeData.content[0].text.trim()
+
+//     return res.status(200).json({
+//       original: basic_input.trim(),
+//       expanded,
+//     })
+
+//   } catch (err) {
+//     console.error('Feeling Expander error:', err)
+//     return res.status(500).json({ error: 'Something went wrong.' })
+//   }
+// })
+// router.post('/expand', requireAuth, async (req, res) => {
+//   const { upload_id, basic_input } = req.body
+//   const userId = req.user.id
+
+//   console.log('[EXPAND] Request received:', { upload_id, basic_input, userId })
+
+//   if (!upload_id || !basic_input?.trim()) {
+//     return res.status(400).json({ error: 'upload_id and basic_input are required' })
+//   }
+
+//   try {
+//     // 1. Fetch the upload
+//     console.log('[EXPAND] Fetching upload from Supabase...')
+//     const { data: upload, error: uploadError } = await supabase
+//       .from('uploads')
+//       .select('id, audio_features, track_type')
+//       .eq('id', upload_id)
+//       .eq('user_id', userId)
+//       .single()
+
+//     if (uploadError) {
+//       console.error('[EXPAND] Supabase upload fetch error:', uploadError)
+//       return res.status(404).json({ error: 'Upload not found or fetch failed' })
+//     }
+
+//     if (!upload) {
+//       console.error('[EXPAND] Upload returned null')
+//       return res.status(404).json({ error: 'Upload not found' })
+//     }
+
+//     console.log('[EXPAND] Upload fetched:', { id: upload.id, track_type: upload.track_type, has_features: !!upload.audio_features })
+
+//     if (upload.track_type !== 'instrumental') {
+//       return res.status(400).json({ error: 'Feeling Expander is only for instrumental tracks' })
+//     }
+
+//     const features = upload.audio_features || {}
+//     console.log('[EXPAND] Audio features:', features)
+
+//     // 2. Call Claude API
+//     console.log('[EXPAND] Calling Claude Haiku API...')
+//     if (!process.env.ANTHROPIC_API_KEY) {
+//       console.error('[EXPAND] ANTHROPIC_API_KEY is missing!')
+//       return res.status(500).json({ error: 'API configuration error' })
+//     }
+
+//     const prompt = `A music producer described their beat as: "${basic_input.trim()}"
+
+// Audio emotional data:
+// - Tempo: ${features.bpm ?? 'unknown'} BPM
+// - Mood: ${features.mood ?? 'unknown'}
+// - Energy: ${features.energy ?? 'unknown'}/100
+// - Key: ${features.key ?? 'unknown'} ${features.scale ?? ''}
+// - Valence (emotional positivity): ${features.valence ?? 'unknown'}/100
+// - Acousticness: ${features.acousticness ?? 'unknown'}/100
+
+// Expand this into a rich 2-3 sentence sensory description.
+// Think: time of day, place, atmosphere, physical sensation, human story.
+// Be specific and vivid. No clichés. No genre names.
+// Return only the description, nothing else.`
+
+//     console.log('[EXPAND] Sending prompt to Claude:', prompt.substring(0, 100) + '...')
+
+//     const response = await fetch('https://api.anthropic.com/v1/messages', {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         'x-api-key': process.env.ANTHROPIC_API_KEY,
+//         'anthropic-version': '2023-06-01',
+//       },
+//       body: JSON.stringify({
+//         model: 'claude-haiku-4-5-20251001',
+//         max_tokens: 200,
+//         messages: [{
+//           role: 'user',
+//           content: prompt
+//         }]
+//       })
+//     })
+
+//     console.log('[EXPAND] Claude API response status:', response.status)
+//     const claudeData = await response.json()
+//     console.log('[EXPAND] Claude API response:', JSON.stringify(claudeData).substring(0, 200))
+
+//     if (!response.ok) {
+//       console.error('[EXPAND] Claude API error (non-ok status):', claudeData)
+//       return res.status(502).json({ 
+//         error: 'Claude API error',
+//         details: claudeData.error?.message || JSON.stringify(claudeData)
+//       })
+//     }
+
+//     if (!claudeData.content || !Array.isArray(claudeData.content) || !claudeData.content[0]?.text) {
+//       console.error('[EXPAND] Claude response missing expected structure:', claudeData)
+//       return res.status(502).json({ 
+//         error: 'Invalid Claude response format',
+//         details: JSON.stringify(claudeData)
+//       })
+//     }
+
+//     const expanded = claudeData.content[0].text.trim()
+//     console.log('[EXPAND] Success! Expanded text:', expanded)
+
+//     return res.status(200).json({
+//       original: basic_input.trim(),
+//       expanded,
+//     })
+
+//   } catch (err) {
+//     console.error('[EXPAND] Unhandled error:', {
+//       message: err.message,
+//       stack: err.stack,
+//       code: err.code,
+//       name: err.name
+//     })
+//     return res.status(500).json({ 
+//       error: 'Something went wrong.',
+//       details: process.env.NODE_ENV === 'development' ? err.message : undefined
+//     })
+//   }
+// })
+// router.post('/expand', requireAuth, async (req, res) => {
+//   const { upload_id, basic_input } = req.body
+//   const userId = req.user.id
+
+//   console.log('[EXPAND] Request received:', { upload_id, basic_input, userId })
+
+//   if (!upload_id || !basic_input?.trim()) {
+//     return res.status(400).json({ error: 'upload_id and basic_input are required' })
+//   }
+
+//   try {
+//     // 1. Fetch the upload
+//     console.log('[EXPAND] Fetching upload from Supabase...')
+//     const { data: upload, error: uploadError } = await supabase
+//       .from('uploads')
+//       .select('id, audio_features, track_type')
+//       .eq('id', upload_id)
+//       .eq('user_id', userId)
+//       .single()
+
+//     if (uploadError) {
+//       console.error('[EXPAND] Supabase upload fetch error:', uploadError)
+//       return res.status(404).json({ error: 'Upload not found or fetch failed' })
+//     }
+
+//     if (!upload) {
+//       console.error('[EXPAND] Upload returned null')
+//       return res.status(404).json({ error: 'Upload not found' })
+//     }
+
+//     console.log('[EXPAND] Upload fetched:', { id: upload.id, track_type: upload.track_type, has_features: !!upload.audio_features })
+
+//     if (upload.track_type !== 'instrumental') {
+//       return res.status(400).json({ error: 'Feeling Expander is only for instrumental tracks' })
+//     }
+
+//     const features = upload.audio_features || {}
+//     console.log('[EXPAND] Audio features:', features)
+
+//     // 2. Call Gemini API instead of Claude
+//     console.log('[EXPAND] Calling Gemini Flash API...')
+//     if (!process.env.GEMINI_API_KEY) {
+//       console.error('[EXPAND] GEMINI_API_KEY is missing!')
+//       return res.status(500).json({ error: 'API configuration error' })
+//     }
+
+//     const prompt = `A music producer described their beat as: "${basic_input.trim()}"
+
+// Audio emotional data:
+// - Tempo: ${features.bpm ?? 'unknown'} BPM
+// - Mood: ${features.mood ?? 'unknown'}
+// - Energy: ${features.energy ?? 'unknown'}/100
+// - Key: ${features.key ?? 'unknown'} ${features.scale ?? ''}
+// - Valence (emotional positivity): ${features.valence ?? 'unknown'}/100
+// - Acousticness: ${features.acousticness ?? 'unknown'}/100
+
+// Expand this into a rich 2-3 sentence sensory description.
+// Think: time of day, place, atmosphere, physical sensation, human story.
+// Be specific and vivid. No clichés. No genre names.
+// Return only the description, nothing else.`
+// console.log(prompt);
+
+
+//     console.log('[EXPAND] Sending prompt to Gemini:', prompt.substring(0, 100) + '...')
+
+//     // Direct REST API call to Gemini 2.5 Flash (or gemini-1.5-flash depending on your target version preference)
+//     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
+
+//     const response = await fetch(url, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         contents: [
+//           {
+//             parts: [
+//               { text: prompt }
+//             ]
+//           }
+//         ],
+//         generationConfig: {
+//           maxOutputTokens: 200,
+//           temperature: 0.7
+//         }
+//       })
+//     })
+
+//     console.log('[EXPAND] Gemini API response status:', response.status)
+//     const geminiData = await response.json()
+    
+//     if (!response.ok) {
+//       console.error('[EXPAND] Gemini API error (non-ok status):', geminiData)
+//       return res.status(502).json({ 
+//         error: 'Gemini API error',
+//         details: geminiData.error?.message || JSON.stringify(geminiData)
+//       })
+//     }
+
+//     // Safely extract the generated text payload from Gemini layout structure
+//     const candidate = geminiData.candidates?.[0]
+//     const expanded = candidate?.content?.parts?.[0]?.text?.trim()
+
+//     if (!expanded) {
+//       console.error('[EXPAND] Gemini response missing expected structure:', geminiData)
+//       return res.status(502).json({ 
+//         error: 'Invalid Gemini response format',
+//         details: JSON.stringify(geminiData)
+//       })
+//     }
+
+//     console.log('[EXPAND] Success! Expanded text:', expanded)
+
+//     return res.status(200).json({
+//       original: basic_input.trim(),
+//       expanded,
+//     })
+
+//   } catch (err) {
+//     console.error('[EXPAND] Unhandled error:', {
+//       message: err.message,
+//       stack: err.stack
+//     })
+//     return res.status(500).json({ 
+//       error: 'Something went wrong.',
+//       details: process.env.NODE_ENV === 'development' ? err.message : undefined
+//     })
+//   }
+// })
 router.post('/expand', requireAuth, async (req, res) => {
   const { upload_id, basic_input } = req.body
   const userId = req.user.id
 
+  console.log("==================================================")
+  console.log('[EXPAND ENGINE] INCOMING SENSORY EXPANSION REQUEST')
+  console.log('[EXPAND ENGINE] Parameters:', { upload_id, basic_input: basic_input?.trim(), userId })
+  console.log("==================================================")
+
   if (!upload_id || !basic_input?.trim()) {
+    console.error('[EXPAND ENGINE] Aborted: Missing required request fields.')
     return res.status(400).json({ error: 'upload_id and basic_input are required' })
   }
 
   try {
+    // 1. Fetch the target row record from Supabase
+    console.log('[EXPAND ENGINE] Querying storage matrix for upload_id:', upload_id)
     const { data: upload, error: uploadError } = await supabase
       .from('uploads')
       .select('id, audio_features, track_type')
@@ -214,54 +547,143 @@ router.post('/expand', requireAuth, async (req, res) => {
       .eq('user_id', userId)
       .single()
 
-    if (uploadError || !upload) {
+    if (uploadError) {
+      console.error('[EXPAND ENGINE] Supabase read operation failed:', uploadError)
+      return res.status(404).json({ error: 'Upload not found or fetch failed', details: uploadError.message })
+    }
+
+    if (!upload) {
+      console.error('[EXPAND ENGINE] Aborted: Supabase returned a null record pointer.')
       return res.status(404).json({ error: 'Upload not found' })
     }
 
+    console.log('[EXPAND ENGINE] Row successfully retrieved:', { 
+      id: upload.id, 
+      track_type: upload.track_type, 
+      has_features_object: !!upload.audio_features 
+    })
+
     if (upload.track_type !== 'instrumental') {
+      console.error(`[EXPAND ENGINE] Aborted: Track type "${upload.track_type}" does not match validation rule "instrumental".`)
       return res.status(400).json({ error: 'Feeling Expander is only for instrumental tracks' })
     }
 
-    const features = upload.audio_features || {}
+    // ==========================================
+    // 2. STRICT NATIVE ESSENTIA VALIDATION GUARDRAIL
+    // ==========================================
+    const features = upload.audio_features
+    console.log('[EXPAND ENGINE] Reading raw database audio_features:', JSON.stringify(features))
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{
-          role: 'user',
-          content: `A music producer described their beat as: "${basic_input.trim()}"
+    if (!features) {
+      console.error('[EXPAND ENGINE] CRITICAL BLANK DATA ENCOUNTERED: The audio_features JSONB block is null or empty.')
+      return res.status(422).json({ 
+        error: 'Unprocessed file layout', 
+        details: 'This file contains no extracted structural traits. Run Essentia native analysis pipeline first.' 
+      })
+    }
+
+    // Explicit array definition of strict required properties matching your frontend extraction payload
+    const requiredFeltKeys = ['bpm', 'mood', 'energy', 'key', 'scale', 'valence', 'acousticness']
+    const missingFeltKeys = []
+
+    for (const key of requiredFeltKeys) {
+      if (features[key] === undefined || features[key] === null || features[key] === '') {
+        missingFeltKeys.push(key)
+      }
+    }
+
+    if (missingFeltKeys.length > 0) {
+      console.error('[EXPAND ENGINE] PIPELINE LOCKED: Missing mandatory native Essentia fields:', missingFeltKeys)
+      console.error('[EXPAND ENGINE] Aborting thread execution to prevent stale placeholder generation.')
+      return res.status(422).json({
+        error: 'Incomplete metric profiles',
+        details: `The feature block is missing verified native parameters: [${missingFeltKeys.join(', ')}]. Fallbacks are locked.`
+      })
+    }
+
+    console.log('[EXPAND ENGINE] All core architectural requirements successfully verified. No fallbacks required.')
+
+    // ==========================================
+    // 3. PROMPT GENERATION
+    // ==========================================
+    const prompt = `A music producer described their beat as: "${basic_input.trim()}"
 
 Audio emotional data:
-- Tempo: ${features.bpm ?? 'unknown'} BPM
-- Mood: ${features.mood ?? 'unknown'}
-- Energy: ${features.energy ?? 'unknown'}/100
-- Key: ${features.key ?? 'unknown'} ${features.scale ?? ''}
-- Valence (emotional positivity): ${features.valence ?? 'unknown'}/100
-- Acousticness: ${features.acousticness ?? 'unknown'}/100
+- Tempo: ${features.bpm} BPM
+- Mood: ${features.mood}
+- Energy: ${features.energy}/100
+- Key: ${features.key} ${features.scale}
+- Valence (emotional positivity): ${features.valence}/100
+- Acousticness: ${features.acousticness}/100
 
 Expand this into a rich 2-3 sentence sensory description.
 Think: time of day, place, atmosphere, physical sensation, human story.
 Be specific and vivid. No clichés. No genre names.
 Return only the description, nothing else.`
-        }]
+
+    console.log("--------------------------------------------------")
+    console.log('[EXPAND ENGINE] GENERATED INFERENCE PROMPT:')
+    console.log(prompt)
+    console.log("--------------------------------------------------")
+
+    // ==========================================
+    // 4. INFERENCE DISPATCH VIA GEMINI FLASH REST
+    // ==========================================
+    if (!process.env.GEMINI_API_KEY) {
+      console.error('[EXPAND ENGINE] CRITICAL API FAULT: GEMINI_API_KEY is missing from system environmental variables!')
+      return res.status(500).json({ error: 'Internal API configuration error' })
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
+    console.log('[EXPAND ENGINE] Dispatching payload to Gemini REST Endpoint...')
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: prompt }
+            ]
+          }
+        ],
+        generationConfig: {
+          maxOutputTokens: 200,
+          temperature: 0.7
+        }
       })
     })
 
-    const claudeData = await response.json()
-
-    if (!response.ok || !claudeData.content?.[0]?.text) {
-      console.error('Claude Haiku error:', claudeData)
-      return res.status(500).json({ error: 'Failed to expand feeling. Please try again.' })
+    console.log('[EXPAND ENGINE] HTTP Response Code back from Gemini API:', response.status)
+    const geminiData = await response.json()
+    
+    if (!response.ok) {
+      console.error('[EXPAND ENGINE] Gemini API Exception (Non-200 Status):', JSON.stringify(geminiData))
+      return res.status(502).json({ 
+        error: 'External inference service exception',
+        details: geminiData.error?.message || JSON.stringify(geminiData)
+      })
     }
 
-    const expanded = claudeData.content[0].text.trim()
+    // Extract content fragments precisely out of the candidate array layers
+    const candidate = geminiData.candidates?.[0]
+    const expanded = candidate?.content?.parts?.[0]?.text?.trim()
+
+    if (!expanded) {
+      console.error('[EXPAND ENGINE] Operational Error: Gemini response layout is malformed or missing strings.', JSON.stringify(geminiData))
+      return res.status(502).json({ 
+        error: 'Invalid response signature received from Gemini engine.',
+        details: JSON.stringify(geminiData)
+      })
+    }
+
+    console.log("==================================================")
+    console.log('[EXPAND ENGINE] INFERENCE SUCCESSFUL')
+    console.log('[EXPAND ENGINE] Output String:', expanded)
+    console.log("==================================================")
 
     return res.status(200).json({
       original: basic_input.trim(),
@@ -269,8 +691,14 @@ Return only the description, nothing else.`
     })
 
   } catch (err) {
-    console.error('Feeling Expander error:', err)
-    return res.status(500).json({ error: 'Something went wrong.' })
+    console.error('[EXPAND ENGINE] UNCAUGHT ROUTE FAULT:')
+    console.error(`[EXPAND ENGINE] Message: ${err.message}`)
+    console.error(`[EXPAND ENGINE] Stack trace:\n${err.stack}`)
+    
+    return res.status(500).json({ 
+      error: 'Internal processing loop failure.',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    })
   }
 })
 
