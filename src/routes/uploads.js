@@ -210,24 +210,25 @@ router.get('/', requireAuth, async (req, res) => {
   const offset = parseInt(req.query.offset) || 0
 
   try {
-    const { data, error, count } = await supabase
-      .from('uploads')
-      .select(`
-        id,
-        title,
-        track_type,
-        status,
-        audio_url,
-        audio_features,
-        sentence_prompt,
-        created_at,
-        generations!upload_id (
-          id,
-          image_url,
-          status,
-          created_at
-        )
-      `, { count: 'exact' })
+  // ─── Update inside both GET router handlers ───────────────────────────────────
+const { data, error, count } = await supabase
+  .from('uploads')
+  .select(`
+    id,
+    title,
+    track_type,
+    status,
+    audio_url,
+    audio_features,
+    sentence_prompt,
+    created_at,
+    generations:generations!upload_id (
+      id,
+      image_url,
+      status,
+      created_at
+    )
+  `, { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
@@ -251,6 +252,7 @@ router.get('/', requireAuth, async (req, res) => {
 })
 
 // ─── GET /api/uploads/:id ─────────────────────────────────────────────────────
+// ─── GET /api/uploads/:id ─────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req, res) => {
   const { id } = req.params
   const userId = req.user.id
@@ -267,7 +269,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         audio_features,
         sentence_prompt,
         created_at,
-        generations!upload_id (
+        generations:generations!upload_id (
           id,
           image_url,
           status,
