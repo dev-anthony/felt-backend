@@ -202,12 +202,22 @@ STRICT ARTISTIC DIRECTION INSTRUCTIONS:
 
     return res.status(200).json({ original: basic_input.trim(), expanded })
 
-  } catch (err) {
-    console.error('[EXPAND ENGINE] FAULT:', err)
-    return res.status(500).json({ error: 'Internal processing loop failure.' })
-  }
-})
+  }catch (err) {
+    console.error('[EXPAND ENGINE] FAULT:', err);
+    
+    // Check if it's the 503 high-demand error specifically
+    if (err.status === 503 || err.code === 'UNAVAILABLE' || err.message?.includes('high demand')) {
+      // Return a status that the frontend can handle, with a clean message
+      return res.status(202).json({ 
+        error: 'High-Demand Outage', 
+        message: 'The fine-art aesthetic engine is currently recalibrating due to high demand. Please attempt your structural modification again in a moment.'
+      });
+    }
 
+    // Handle standard processing failures as 500
+    return res.status(500).json({ error: 'Internal processing loop failure.' });
+  }
+});
 /**
  * POST /api/generations/transcribe
  */

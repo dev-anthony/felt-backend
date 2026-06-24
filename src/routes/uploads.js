@@ -204,33 +204,36 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
   }
 })
 
+// ─── UPDATED GET ROUTE WITH NESTED RELATIONSHIP ORDERING ───────────────────────────────────
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id
-  const limit = Math.min(parseInt(req.query.limit) || 20, 50) // cap at 50
+  const limit = Math.min(parseInt(req.query.limit) || 20, 50)
   const offset = parseInt(req.query.offset) || 0
 
   try {
-  // ─── Update inside both GET router handlers ───────────────────────────────────
-const { data, error, count } = await supabase
-  .from('uploads')
-  .select(`
-    id,
-    title,
-    track_type,
-    status,
-    audio_url,
-    audio_features,
-    sentence_prompt,
-    created_at,
-    generations:generations!upload_id (
-      id,
-      image_url,
-      status,
-      created_at
-    )
-  `, { count: 'exact' })
+    const { data, error, count } = await supabase
+      .from('uploads')
+      .select(`
+        id,
+        title,
+        track_type,
+        status,
+        audio_url,
+        audio_features,
+        sentence_prompt,
+        created_at,
+        generations:generations!upload_id (
+          id,
+          image_url,
+          status,
+          created_at,
+          prompt_used
+        )
+      `, { count: 'exact' })
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
+      // FIX: Force the generations subarray rows to sort newest first
+      .order('created_at', { foreignTable: 'generations', ascending: false }) 
       .range(offset, offset + limit - 1)
 
     if (error) {
