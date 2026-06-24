@@ -251,8 +251,6 @@ const { data, error, count } = await supabase
   }
 })
 
-// ─── GET /api/uploads/:id ─────────────────────────────────────────────────────
-// ─── GET /api/uploads/:id ─────────────────────────────────────────────────────
 router.get('/:id', requireAuth, async (req, res) => {
   const { id } = req.params
   const userId = req.user.id
@@ -272,6 +270,7 @@ router.get('/:id', requireAuth, async (req, res) => {
         generations:generations!upload_id (
           id,
           image_url,
+          prompt_used,
           status,
           created_at
         )
@@ -286,6 +285,11 @@ router.get('/:id', requireAuth, async (req, res) => {
       }
       console.error('Upload fetch failed:', error.message)
       return res.status(500).json({ error: 'Failed to load upload.' })
+    }
+
+    // Sort generations descending right here to guarantee latest is first in array index
+    if (data.generations && data.generations.length > 0) {
+      data.generations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     }
 
     return res.status(200).json({ upload: data })
