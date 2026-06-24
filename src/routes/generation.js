@@ -1,4 +1,3 @@
-
 const express = require('express')
 const router = express.Router()
 const supabase = require('../utils/supabase')
@@ -13,61 +12,44 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 const { HfInference } = require('@huggingface/inference')
 const hf = new HfInference(process.env.HF_TOKEN)
 
-// ─── Layer 1: The Synesthetic System Prompt (Artistic Enforcement Matrix) ───
-// const SYNESTHETIC_SYSTEM_PROMPT = `You are a synesthetic fine artist, not a commercial photographer.
-// When music enters you, it translates into texture, human brushwork, visceral mediums, and tangible depth.
+// LAYER 1: FELT — Structural Archetype System Prompt
+const AESTHETIC_SYSTEM_PROMPT = `You are a synesthetic visual artist and an elite music cover art director.
+You do not interpret text literally; you translate the underlying feeling into a high-concept, structural visual composition.
+Every image must be a definitive, 1:1 edge-to-edge square single cover for streaming platforms—never render physical canvases, frames, borders, or galleries.
 
-// CRITICAL INSTRUCTIONS FOR IMAGE COMPOSITION:
-// 1. DO NOT render standard stock photography, generic digital renderings, flat vector graphics, or clean AI-generated realism.
-// 2. ENFORCE fine-art mediums. Manifest artwork through the lens of concrete fine-art styles: oil on canvas, textured mixed-media collage, heavy impasto palette knife layers, dark expressionism, analog darkroom experimental photography, low-brow surrealism, or gritty lithographic printmaking textures.
-// 3. Prioritize raw artistic execution, visible textures, moody lighting depth, complex color interactions, and deliberate imperfection over clinical clarity.
-// 4. Treat composition with poetic abstraction and deep atmosphere. 
+When an expansion or description is input, you must dynamically execute it through one of the following structural design vehicles, chosen to best match the emotional energy:
 
-// Feel the music first. Externalize a tangible piece of fine art.`
+1. SURREAL METAPHOR (For Internal Conflict, Pain, or Intense Feelings)
+   - Do not use digital clichés. Translate abstract psychological states into literal, physical realities seamlessly integrated with the subject. (e.g., physical objects piercing or interacting with a body, a head replaced or covered by an object under tension, impossible physical postures that convey heavy emotional strain).
 
-// // ─── Helpers ──────────────────────────────────────────────────────────────────
-// const audioFeaturesToVisualBrief = (features) => {
-//   const { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood, speechiness, genre } = features
-//   const parts = []
+2. MONUMENTAL SCALE & ISOLATION (For Loneliness, Freedom, or Grand Atmospheric Moods)
+   - Utilize a single, massive, dominant graphic element or environmental feature to swallow the frame and dwarf the subject. This could be an oversized celestial body on a flat horizon, an immense singular cloud formation, or a vast, empty landscape that forces a small silhouette into a state of absolute isolation or freedom.
 
-//   parts.push(`This track belongs structurally and culturally to the lineage of ${genre}`)
-//   parts.push(`Tempo dictates emotional pace at exactly ${bpm} BPM in the key of ${key} ${scale}`)
-//   parts.push(`Energy level sits at ${energy}/100, representing structural contrast and intensity`)
-//   parts.push(`Valence registers at ${valence}/100, modifying color temperature and emotional dark weights`)
-//   parts.push(`Danceability maps at ${danceability}/100, capturing the physical rhythm matrix`)
-//   parts.push(`Acoustic density registers at ${acousticness}/100, defining raw organic human texture versus synthetic electronic precision`)
-//   parts.push(`Spectral brightness scales at ${spectral_brightness}/100, shaping airy high-frequencies or sub-bass color density`)
-//   parts.push(`Loudness records at ${loudness} dB, configuring structural compression thresholds`)
-//   parts.push(`Speechiness density sits at ${speechiness}/100, indicating vocal/lyrical presence or transient texture`)
-//   parts.push(`Overall structural kinetic movement matches an overarching ${mood} emotional profile`)
+3. REPETITIVE TEXTURE & ENCLOSURE (For Intimacy, Claustrophobia, or Hyper-Focused Narrative)
+   - Wrap the subject in a cohesive, enveloping texture or repetitive environmental pattern. This includes scenes where walls, floors, or backgrounds are entirely composed of a singular material (e.g., newsprint, distressed concrete, uniform textiles, raw timber) to trap light, eliminate distractions, and force intense focus onto the character's presence.
 
-//   return parts.join('. ')
-// }
-const AESTHETIC_SYSTEM_PROMPT = `You are an avant-garde aesthetic fine artist, not a commercial photographer.
-When music enters you, it translates into texture, human brushwork, visceral mediums, and tangible depth.
+4. MUNDANE REALISM & TONAL VIGNETTES (For Nostalgia, Calm, or Raw Storytelling)
+   - Capture quiet, un-staged human presence anchored to relatable, textured environments (e.g., a low-angle shot outside a weathered brick house next to an old car, a figure sitting on a curb). The power comes from the stillness, natural lighting, and tangible micro-textures (skin imperfections, grain, dust, clothing folds) that make it look completely real.
 
-CRITICAL INSTRUCTIONS FOR IMAGE COMPOSITION:
-1. DO NOT render standard stock photography, generic digital renderings, flat vector graphics, or clean AI-generated realism.
-2. ENFORCE fine-art mediums. Manifest artwork through the lens of concrete fine-art styles: oil on canvas, textured mixed-media collage, heavy impasto palette knife layers, dark expressionism, analog darkroom experimental photography, low-brow surrealism, or gritty lithographic printmaking textures.
-3. Prioritize raw artistic execution, visible textures, moody lighting depth, complex color interactions, and deliberate imperfection over clinical clarity.
-4. Treat composition with poetic abstraction and deep atmosphere. 
-
-Feel the music first. Externalize a tangible piece of fine art.`;
+EXECUTION CRITERIA:
+- Camera Authenticity: Every generation must look entirely captured by a real camera lens. Skin must have pores; textiles must hold visible weave; natural elements must have real physical weight. 
+- Avoid Clichés: Never generate purple/teal floating neon, generic digital particle fields, or glossy, plastic AI skin tones. The image must feel intentional, moody, and raw.`;
 
 const audioFeaturesToVisualDescription = (features) => {
+  if (!features) return "Audio structural variables aligned to standard baseline frequencies.";
   const { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood, speechiness, genre } = features;
   const parts = [];
 
-  parts.push(`This track belongs structurally and culturally to the lineage of ${genre}`);
-  parts.push(`Tempo dictates the emotional pace at exactly ${bpm} BPM in the key of ${key} ${scale}`);
-  parts.push(`Energy level sits at ${energy}/100, representing structural contrast and intensity`);
-  parts.push(`Valence registers at ${valence}/100, modifying color temperature and emotional dark weights`);
-  parts.push(`Danceability maps at ${danceability}/100, capturing the physical rhythm matrix`);
-  parts.push(`Acoustic density registers at ${acousticness}/100, defining raw organic human texture versus synthetic electronic precision`);
-  parts.push(`Spectral brightness scales at ${spectral_brightness}/100, shaping airy high-frequencies or sub-bass color density`);
-  parts.push(`Loudness records at ${loudness} dB, configuring structural compression thresholds`);
-  parts.push(`Speechiness density sits at ${speechiness}/100, indicating vocal/lyrical presence or transient texture`);
-  parts.push(`Overall structural kinetic movement matches an overarching ${mood} emotional profile`);
+  parts.push(`This track belongs structurally and culturally to the lineage of ${genre || 'Contemporary Sound'}`);
+  parts.push(`Tempo dictates the emotional pace at exactly ${bpm || 90} BPM in the key of ${key || 'C'} ${scale || 'Major'}`);
+  parts.push(`Energy level sits at ${energy || 50}/100, representing structural contrast and intensity`);
+  parts.push(`Valence registers at ${valence || 50}/100, modifying color temperature and emotional dark weights`);
+  parts.push(`Danceability maps at ${danceability || 50}/100, capturing the physical rhythm matrix`);
+  parts.push(`Acoustic density registers at ${acousticness || 50}/100, defining raw organic human texture versus synthetic electronic precision`);
+  parts.push(`Spectral brightness scales at ${spectral_brightness || 50}/100, shaping airy high-frequencies or sub-bass color density`);
+  parts.push(`Loudness records at ${loudness || -6} dB, configuring structural compression thresholds`);
+  parts.push(`Speechiness density sits at ${speechiness || 10}/100, indicating vocal/lyrical presence or transient texture`);
+  parts.push(`Overall structural kinetic movement matches an overarching ${mood || 'balanced'} emotional profile`);
 
   return parts.join('. ');
 };
@@ -78,72 +60,12 @@ const audioFeaturesToVisualDescription = (features) => {
  * POST /api/generations/expand
  * Layer 2 Expansion for Manual Triggers
  */
-// router.post('/expand', requireAuth, async (req, res) => {
-//   const { upload_id, basic_input } = req.body
-//   const userId = req.user.id
-
-//   if (!upload_id || !basic_input?.trim()) {
-//     return res.status(400).json({ error: 'upload_id and basic_input are required' })
-//   }
-
-//   try {
-//     const { data: upload, error: uploadError } = await supabase
-//       .from('uploads')
-//       .select('id, audio_features, track_type')
-//       .eq('id', upload_id)
-//       .eq('user_id', userId)
-//       .single()
-
-//     if (uploadError || !upload) {
-//       return res.status(404).json({ error: 'Upload not found' })
-//     }
-
-//     const features = upload.audio_features
-//     if (!features) {
-//       return res.status(422).json({ error: 'Unprocessed file layout. Run analysis pipeline first.' })
-//     }
-
-//     const promptText = `You are a cinematic creative director translating music properties into evocative scenes.
-// A music producer described their beat as: "${basic_input.trim()}"
-
-// The beat's actual emotional data from audio analysis:
-// - Genre Lineage: ${features.genre}
-// - Tempo: ${features.bpm} BPM
-// - Key/Scale: ${features.key} ${features.scale}
-// - Mood classification: ${features.mood}
-// - Energy level: ${features.energy}/100
-// - Valence (Emotional Light/Darkness): ${features.valence}/100
-
-// TASK: Expand the producer's basic description into a rich 2-3 sentence sensory brief.
-// INSTRUCTIONS: Ground the description in specific textures, atmosphere, lighting conditions, or settings. Return ONLY the 2-3 sentence description. No intros.`
-
-//     const response = await ai.models.generateContent({
-//       model: 'gemini-2.5-flash',
-//       contents: promptText,
-//       config: {
-//         maxOutputTokens: 300,
-//         temperature: 0.75,
-//       },
-//     })
-
-//     const expanded = response.text?.trim()
-//     if (!expanded) {
-//       return res.status(502).json({ error: 'Invalid response context extracted from Gemini engine.' })
-//     }
-
-//     return res.status(200).json({ original: basic_input.trim(), expanded })
-
-//   } catch (err) {
-//     console.error('[EXPAND ENGINE] FAULT:', err)
-//     return res.status(500).json({ error: 'Internal processing loop failure.' })
-//   }
-// })
 router.post('/expand', requireAuth, async (req, res) => {
-  const { upload_id, basic_input } = req.body
-  const userId = req.user.id
+  const { upload_id, basic_input } = req.body;
+  const userId = req.user.id;
 
   if (!upload_id || !basic_input?.trim()) {
-    return res.status(400).json({ error: 'upload_id and basic_input are required' })
+    return res.status(400).json({ error: 'upload_id and basic_input are required' });
   }
 
   try {
@@ -152,72 +74,59 @@ router.post('/expand', requireAuth, async (req, res) => {
       .select('id, audio_features, track_type')
       .eq('id', upload_id)
       .eq('user_id', userId)
-      .single()
+      .single();
 
     if (uploadError || !upload) {
-      return res.status(404).json({ error: 'Upload not found' })
+      return res.status(404).json({ error: 'Upload record not found' });
     }
 
-    const features = upload.audio_features
+    const features = upload.audio_features;
     if (!features) {
-      return res.status(422).json({ error: 'Unprocessed file layout. Run analysis pipeline first.' })
+      return res.status(422).json({ error: 'Unprocessed file layout. Run analysis pipeline first.' });
     }
 
-    // ─── SYNTHESIZE THE KINETIC DATA SPECTRUM ───
-    const promptText = `You are a visionary aesthetic fine artist. You translate raw human musical intent and structural audio data into vivid, expressive scenes captured through tactile, high-vibe fine art mediums.
+    const promptText = `You are an elite creative director specializing in conceptual single cover art design. Your job is to transform a raw user text input into a highly evocative, 2-3 sentence visual description by mapping the underlying emotion to a structural composition type.
 
-The artist's explicit emotional feeling and cultural vision for this track:
-"${basic_input.trim()}"
+The artist's basic input: "${basic_input.trim()}"
+Track Audio Data: ${features.bpm || 90} BPM, Mood: ${features.mood || 'Atmospheric'}.
 
-The track's mechanical audio analytics:
-- Cultural DNA/Genre: ${features.genre}
-- Tempo & Pace: ${features.bpm} BPM
-- Sonic Architecture: Key of ${features.key} ${features.scale}, Loudness of ${features.loudness} dB
-- Structural Mood: ${features.mood} (Energy: ${features.energy}/100, Valence/Emotional Light: ${features.valence}/100)
-- Textural Attributes: Acoustic Organic Density: ${features.acousticness}/100, Frequency Brightness: ${features.spectral_brightness}/100
-
-TASK: Synthesize the artist's feeling and the audio metrics into a singular, highly atmospheric, 2-3 sentence visual description meant to be rendered on a fine-art canvas.
-
-STRICT ARTISTIC DIRECTION INSTRUCTIONS:
-1. REJECT THE MODEST AND BORING: Absolutely no clean digital art, flat realism, or standard stock photo composition. Think like a raw, expressive contemporary painter.
-2. HIGH-AESTHETIC CHARACTER STYLING: You CAN include human figures, but they must look artistically striking, fashionable, and stylized. Avoid ordinary, casual, or modest clothing. Describe high-fashion silhouettes, avant-garde textures, fluid textiles, bold cultural drapes, or expressive artistic streetwear that merges seamlessly into the environment. 
-3. INTENSE KINETIC VIBE: Capture characters in motion or deep mood—such as a dynamic Black figure or a woman locked in a fluid Afrobeat dance posture, where their form and styling dissolve organically into the canvas.
-4. CULTURAL & ENVIRONMENTAL RELATIONSHIP: Harmonize the setting with the track's true spirit. If the user invokes Afrobeat culture with high energy or warm valence, describe an aesthetic scene heavy with deep golden-hour sun flares, rich earthy pigment splatters, kinetic brushstrokes, and layered textures that pulse with rhythm.
-5. TEXTURAL VOCABULARY: Infuse the text with descriptive, tangible fine-art mediums and surface properties—describe impasto layers, thick knife marks, dark expressionist shadows, rich multimedia collage elements, or heavy lithographic grain.
-6. NO FRAMING: Output ONLY the raw 2-3 sentence visual description. Do not include intros, conversational filler, or bullet points.`
-
+INSTRUCTIONS:
+1. IDENTIFY THE EMOTIONAL CORE: Determine if the input feels internal/conflicted, grand/isolated, intimate/trapped, or quiet/nostalgic.
+2. CHOOSE A STRUCTURAL VEHICLE:
+   - For internal/conflicted: Design a SURREAL METAPHOR where a physical object or condition represents their mind state.
+   - For grand/isolated: Design a MONUMENTAL SCALE scene using an immense backdrop (a giant sun, towering cloud, vast sky) to frame a silhouette.
+   - For intimate/trapped: Design an ENCLOSURE using a repetitive textural backdrop or environment that wraps around the character.
+   - For quiet/nostalgic: Design a piece of MUNDANE REALISM focusing on a still, textured, highly human vignette.
+3. WRITE THE BRIEF: Describe the scene with intense focus on lighting, texture, and character posture. Do not use generic filler or mention the name of the archetype. Output ONLY the 2-3 sentence visual description.`;
+    
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
         maxOutputTokens: 300,
-        temperature: 0.72, // Slighly dialed down for strict architectural compliance
+        temperature: 0.75,
       },
-    })
+    });
 
-    const expanded = response.text?.trim()
+    const expanded = response.text?.trim();
     if (!expanded) {
-      return res.status(502).json({ error: 'Invalid response context extracted from Gemini engine.' })
+      return res.status(502).json({ error: 'Invalid response context extracted from Gemini engine.' });
     }
 
-    return res.status(200).json({ original: basic_input.trim(), expanded })
+    return res.status(200).json({ original: basic_input.trim(), expanded });
 
-  }catch (err) {
+  } catch (err) {
     console.error('[EXPAND ENGINE] FAULT:', err);
-    
-    // Check if it's the 503 high-demand error specifically
     if (err.status === 503 || err.code === 'UNAVAILABLE' || err.message?.includes('high demand')) {
-      // Return a status that the frontend can handle, with a clean message
       return res.status(202).json({ 
         error: 'High-Demand Outage', 
-        message: 'The fine-art aesthetic engine is currently recalibrating due to high demand. Please attempt your structural modification again in a moment.'
+        message: 'The fine-art engine is recalibrating. Falling back to native structural blueprint mode.'
       });
     }
-
-    // Handle standard processing failures as 500
     return res.status(500).json({ error: 'Internal processing loop failure.' });
   }
 });
+
 /**
  * POST /api/generations/transcribe
  */
@@ -275,7 +184,7 @@ router.post('/transcribe', requireAuth, async (req, res) => {
 
 /**
  * POST /api/generations
- * Fully incorporates Gemini in-line context mapping fallback chains
+ * Primary generation route with bulletproof Gemini 503 fallback built-in
  */
 router.post('/', requireAuth, async (req, res) => {
   const { upload_id, lyric_context } = req.body
@@ -311,24 +220,29 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'Audio analysis must complete before generating art' })
     }
 
-    const visualBrief = audioFeaturesToVisualBrief(upload.audio_features)
+    // FIXED: Corrected mapping function signature name error
+    const visualBrief = audioFeaturesToVisualDescription(upload.audio_features)
     const rawInputText = lyric_context || upload.sentence_prompt || "Abstract emotion"
 
-    // ─── 🛠️ FIXED: INLINE GEMINI ENGINE FALLBACK IF UNEXPANDED ───
     let expandedBrief = rawInputText
 
-    if (!rawInputText.includes(SYNESTHETIC_SYSTEM_PROMPT) && rawInputText.length < 150) {
+    // FIXED: Point to the new engine identifier system layout string
+    if (!rawInputText.includes("AESTHETIC_SYSTEM_PROMPT") && rawInputText.length < 150) {
       try {
         console.log(`[INLINE EXPANSION ENGINE] Processing raw descriptor: "${rawInputText}"`)
-        const promptText = `You are a cinematic creative director translating music properties into evocative scenes.
-A music producer described their beat as: "${rawInputText.trim()}"
+        const promptText = `You are an elite creative director specializing in conceptual single cover art design. Your job is to transform a raw user text input into a highly evocative, 2-3 sentence visual description by mapping the underlying emotion to a structural composition type.
 
-The beat's actual emotional data from audio analysis:
-- Genre Lineage: ${upload.audio_features.genre}
-- Tempo: ${upload.audio_features.bpm} BPM
-- Mood classification: ${upload.audio_features.mood}
+The artist's basic input: "${rawInputText.trim()}"
+Track Audio Data: ${upload.audio_features?.bpm || 90} BPM, Mood: ${upload.audio_features?.mood || 'Atmospheric'}.
 
-TASK: Expand the description into a rich 2-3 sentence sensory brief based on this data. Return ONLY the description.`
+INSTRUCTIONS:
+1. IDENTIFY THE EMOTIONAL CORE: Determine if the input feels internal/conflicted, grand/isolated, intimate/trapped, or quiet/nostalgic.
+2. CHOOSE A STRUCTURAL VEHICLE:
+   - For internal/conflicted: Design a SURREAL METAPHOR where a physical object or condition represents their mind state.
+   - For grand/isolated: Design a MONUMENTAL SCALE scene using an immense backdrop (a giant sun, towering cloud, vast sky) to frame a silhouette.
+   - For intimate/trapped: Design an ENCLOSURE using a repetitive textural backdrop or environment that wraps around the character.
+   - For quiet/nostalgic: Design a piece of MUNDANE REALISM focusing on a still, textured, highly human vignette.
+3. WRITE THE BRIEF: Describe the scene with intense focus on lighting, texture, and character posture. Do not use generic filler or mention the name of the archetype. Output ONLY the 2-3 sentence visual description.`;
 
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
@@ -340,17 +254,19 @@ TASK: Expand the description into a rich 2-3 sentence sensory brief based on thi
           expandedBrief = geminiResponse.text.trim()
         }
       } catch (gErr) {
-        console.error('⚠️ Inline expansion fell back to raw text execution matrix:', gErr)
+        // BULLETPROOF FALLBACK: Silently fall back to utilizing the raw text description if Gemini 503s
+        console.error('⚠️ Inline expansion caught Gemini outage, falling back seamlessly to raw user string:', gErr.message || gErr)
+        expandedBrief = rawInputText.trim()
       }
     }
 
-    const combinedPromptString = `${SYNESTHETIC_SYSTEM_PROMPT}\n\n` +
+    const combinedPromptString = `${AESTHETIC_SYSTEM_PROMPT}\n\n` +
       `Now feel this specific music and generate its cover art.\n` +
       `AUDIO EMOTIONAL DATA:\n${visualBrief}\n\n` +
-      `WHAT THIS MUSIC FEELS LIKE (Sensory Brief):\n${expandedBrief}\n\n` +
+      `WHAT THIS MUSIC FEELS LIKE (Sensory Archetype Brief):\n${expandedBrief}\n\n` +
       `ARTIST IDENTITY:\n` +
-      `City: ${artistProfile.city || 'Unknown'}\n` +
-      `Their sound attributes: ${artistProfile.sound_words || 'Raw'}`;
+      `City: ${artistProfile.city || 'Unknown Space'}\n` +
+      `Their sound attributes: ${artistProfile.sound_words || 'Raw Collective'}`;
 
     const generationId = crypto.randomUUID()
     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id)
@@ -447,7 +363,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
   const userId = req.user.id;
 
   if (!upload_id || !lyric_context?.trim()) {
-    return res.status(400).json({ error: 'upload_id and modified lyric_context intent parameters are required.' });
+    return res.status(400).json({ error: 'upload_id and modified lyric_context parameters are required.' });
   }
 
   try {
@@ -472,33 +388,34 @@ router.patch('/refine', requireAuth, async (req, res) => {
     const upload = uploadResult.data;
     const artistProfile = profileResult.data || {};
     
-    // Using our updated visual description converter
-    const visualDescription = audioFeaturesToVisualDescription(upload.audio_features);
+    // FIXED: Swapped signature call to utilize correct visual mapping function layout
+    const visualDescription = upload.audio_features 
+      ? audioFeaturesToVisualDescription(upload.audio_features)
+      : `Audio properties mapped to standard creative profile layout variables.`;
 
     let combinedPromptString = lyric_context.trim();
 
-    if (!combinedPromptString.includes(AESTHETIC_SYSTEM_PROMPT)) {
+    if (!combinedPromptString.includes("AESTHETIC_SYSTEM_PROMPT")) {
       let historicalContext = "";
       if (image_url) {
-        historicalContext = `PREVIOUS ARTWORK CONTEXT LAYERS:\n` +
-          `- Build upon the structural composition and visual layouts established in the prior generation: ${image_url}\n` +
-          `- Incorporate the following modifications, layering them seamlessly onto that visual base.\n\n`;
+        historicalContext = `PREVIOUS ARTWORK DESIGN CONTEXT:\n` +
+          `- Iterate upon the layout structures and compositions established in the prior generation: ${image_url}\n` +
+          `- Seamlessly layer the following modifications onto that visual base.\n\n`;
       }
 
       combinedPromptString = `${AESTHETIC_SYSTEM_PROMPT}\n\n` +
-        `Now feel this specific music and iterate on its fine art cover layout.\n\n` +
-        `AUDIO EMOTIONAL DESCRIPTION DATA:\n${visualDescription}\n\n` +
+        `TRACK CORE SONIC ANALYSIS DATA:\n${visualDescription}\n\n` +
         `${historicalContext}` +
-        `ARTIST MODIFICATIONS & UPDATED VISUAL DESCRIPTION INTENT:\n${lyric_context.trim()}\n\n` +
-        `ARTIST IDENTITY:\n` +
-        `City: ${artistProfile.city || 'Unknown'}\n` +
-        `Their sound attributes: ${artistProfile.sound_words || 'Raw'}`;
+        `ARTIST VISUAL INTENT & DESCRIPTION BLUEPRINT:\n${lyric_context.trim()}\n\n` +
+        `CREATOR BRAND DESIGN ATTRIBUTES:\n` +
+        `Origin: ${artistProfile.city || 'Unknown space'}\n` +
+        `Signature Sound Identity: ${artistProfile.sound_words || 'Raw Collective'}`;
     }
 
     const generationId = crypto.randomUUID();
     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id);
 
-    console.log(`[HF-FLUX-REFINEMENT] Refining Generation State via Serverless Inference. ID: ${generationId}`);
+    console.log(`[HF-FLUX-REFINEMENT] Launching pipeline serverless inference generation layer. ID: ${generationId}`);
 
     let imagePayloadUrl;
     try {
@@ -513,7 +430,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
     } catch (hfErr) {
       console.error('❌ [HF REFINEMENT PIPELINE FAULT]:', hfErr);
       await supabase.from('uploads').update({ status: 'complete' }).eq('id', upload_id);
-      return res.status(502).json({ error: 'Hugging Face refinement image rendering loop failed.' });
+      return res.status(502).json({ error: 'Hugging Face image refinement loop engine timed out.' });
     }
 
     let permanentUrl;
@@ -526,7 +443,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
       });
       permanentUrl = result.secure_url;
     } catch (cloudinaryErr) {
-      console.error('Cloudinary asset upload failure, fallback applied:', cloudinaryErr);
+      console.error('Cloudinary upload error, applying base64 payload backup stream:', cloudinaryErr);
       permanentUrl = imagePayloadUrl;
     }
 
@@ -543,7 +460,13 @@ router.patch('/refine', requireAuth, async (req, res) => {
       })
       .throwOnError();
 
-    await supabase.from('uploads').update({ status: 'complete' }).eq('id', upload_id);
+    await supabase
+      .from('uploads')
+      .update({ 
+        status: 'complete',
+        sentence_prompt: lyric_context.trim() 
+      })
+      .eq('id', upload_id);
 
     return res.status(201).json({
       generation_id: generationId,
@@ -556,4 +479,4 @@ router.patch('/refine', requireAuth, async (req, res) => {
   }
 });
 
-module.exports = router
+module.exports = router;
