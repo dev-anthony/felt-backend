@@ -56,21 +56,22 @@ const audioFeaturesToVisualDescription = (features) => {
 
 // ─── Shared Gemini Director Prompt Generator ───────────────────────────────────
 const generateDirectorPrompt = (basicInput, features) => {
-  return `You are an elite creative director specializing in high-concept single cover art design. Your goal is to expand an artist's raw feeling or lyric snippet into a deeply descriptive, cinematic scene blueprint.
+  return `You are an elite album cover art director translating raw human intent and sonic metrics into a 2-3 sentence visual description optimized for an image generation engine.
 
-Artist's Abstract Feeling/Input: "${basicInput.trim()}"
-Sonic Metadata Profile: ${features.bpm || 90} BPM, Overarching Mood: ${features.mood || 'Atmospheric'}, Genre: ${features.genre || 'Alternative'}.
+Artist's Input: "${basicInput.trim()}"
+Track Profile: ${features.bpm || 90} BPM, Mood: ${features.mood || 'Atmospheric'}.
 
-MAPPING ARCHETYPES (Select the single best structural option based on the input):
-1. SURREAL METAPHOR: For internal conflict or intense pain. Translate psychological states into physical realities interacting with a subject.
-2. MONUMENTAL SCALE & ISOLATION: For feelings of hope, freedom, vastness, or profound loneliness. Use a massive backdrop (an immense singular cloud formation, a giant low-hanging sun, a sweeping empty horizon) that dwarfs the subject.
-3. REPETITIVE TEXTURE & ENCLOSURE: For hyper-focused, intimate, or claustrophobic feelings. Build an entire environment wrapped uniformly in newsprint, raw concrete, or weathered wood pages.
-4. MUNDANE REALISM: For calm, nostalgia, or raw urban storytelling. Capture authentic, un-staged moments in textured, everyday environments (e.g., sitting beside an old car, leaning on a brick facade).
+YOUR CRITICAL DESIGN VEHICLES (Use these internally as your creative toolbox to translate the feeling):
+- For internal conflict or heavy emotional pain, translate psychological states into a physical, raw reality interacting with the subject (e.g., impossible postures under tension, objects piercing or replacing human elements).
+- For feelings of hope, freedom, vastness, or profound isolation, use a monumental, overwhelming scale backdrop (an immense singular cloud formation, a giant low-hanging celestial sun, a sweeping flat horizon) that dwarfs a lone subject.
+- For hyper-focused, intimate, or claustrophobic feelings, build an enclosed environment wrapped uniformly in a repetitive pattern or rich texture (e.g., newsprint sheets, distressed raw concrete, weathered book pages).
+- For calm, nostalgia, or raw urban storytelling, look to mundane realism—still, highly human vignettes in everyday environments (e.g., sitting on a curb beside a vintage car).
 
-CRITICAL DIRECTIVES:
-- Transform abstract text (e.g., "hopeful for better days") into a tangible, physical image. If hope is the theme, map it to MONUMENTAL SCALE or MUNDANE REALISM. Avoid cliches like a basic silhouette staring at a sunset. Describe complex textures, realistic camera lens lighting interaction, tangible clothing materials, and raw environmental dust or grain.
-- DO NOT summarize or use meta-language. Do not write "This image represents..." 
-- Provide exactly 2-3 highly detailed, descriptive sentences. Ensure the final sentence is fully written out and structurally complete. Do not truncate mid-thought.`;
+STRICT OUTPUT FORMAT RULES:
+1. Output ONLY the raw 2-3 sentence visual description prompt. 
+2. DO NOT mention the words "Selected Archetype", "Archetype", or include the category titles in your output.
+3. DO NOT use structural labels, introductory text, bolding, or markdown headers. 
+4. Translate abstract feelings (like "hopeful for better days") immediately into a concrete, photographic scene description. Ensure the final sentence is grammatically complete and fully written out without truncation.`;
 };
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
