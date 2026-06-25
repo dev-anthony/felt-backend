@@ -54,6 +54,25 @@ const audioFeaturesToVisualDescription = (features) => {
   return parts.join('. ');
 };
 
+// ─── Shared Gemini Director Prompt Generator ───────────────────────────────────
+const generateDirectorPrompt = (basicInput, features) => {
+  return `You are an elite creative director specializing in high-concept single cover art design. Your goal is to expand an artist's raw feeling or lyric snippet into a deeply descriptive, cinematic scene blueprint.
+
+Artist's Abstract Feeling/Input: "${basicInput.trim()}"
+Sonic Metadata Profile: ${features.bpm || 90} BPM, Overarching Mood: ${features.mood || 'Atmospheric'}, Genre: ${features.genre || 'Alternative'}.
+
+MAPPING ARCHETYPES (Select the single best structural option based on the input):
+1. SURREAL METAPHOR: For internal conflict or intense pain. Translate psychological states into physical realities interacting with a subject.
+2. MONUMENTAL SCALE & ISOLATION: For feelings of hope, freedom, vastness, or profound loneliness. Use a massive backdrop (an immense singular cloud formation, a giant low-hanging sun, a sweeping empty horizon) that dwarfs the subject.
+3. REPETITIVE TEXTURE & ENCLOSURE: For hyper-focused, intimate, or claustrophobic feelings. Build an entire environment wrapped uniformly in newsprint, raw concrete, or weathered wood pages.
+4. MUNDANE REALISM: For calm, nostalgia, or raw urban storytelling. Capture authentic, un-staged moments in textured, everyday environments (e.g., sitting beside an old car, leaning on a brick facade).
+
+CRITICAL DIRECTIVES:
+- Transform abstract text (e.g., "hopeful for better days") into a tangible, physical image. If hope is the theme, map it to MONUMENTAL SCALE or MUNDANE REALISM. Avoid cliches like a basic silhouette staring at a sunset. Describe complex textures, realistic camera lens lighting interaction, tangible clothing materials, and raw environmental dust or grain.
+- DO NOT summarize or use meta-language. Do not write "This image represents..." 
+- Provide exactly 2-3 highly detailed, descriptive sentences. Ensure the final sentence is fully written out and structurally complete. Do not truncate mid-thought.`;
+};
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 /**
@@ -80,31 +99,15 @@ router.post('/expand', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Upload record not found' });
     }
 
-    const features = upload.audio_features;
-    if (!features) {
-      return res.status(422).json({ error: 'Unprocessed file layout. Run analysis pipeline first.' });
-    }
-
-    const promptText = `You are an elite creative director specializing in conceptual single cover art design. Your job is to transform a raw user text input into a highly evocative, 2-3 sentence visual description by mapping the underlying emotion to a structural composition type.
-
-The artist's basic input: "${basic_input.trim()}"
-Track Audio Data: ${features.bpm || 90} BPM, Mood: ${features.mood || 'Atmospheric'}.
-
-INSTRUCTIONS:
-1. IDENTIFY THE EMOTIONAL CORE: Determine if the input feels internal/conflicted, grand/isolated, intimate/trapped, or quiet/nostalgic.
-2. CHOOSE A STRUCTURAL VEHICLE:
-   - For internal/conflicted: Design a SURREAL METAPHOR where a physical object or condition represents their mind state.
-   - For grand/isolated: Design a MONUMENTAL SCALE scene using an immense backdrop (a giant sun, towering cloud, vast sky) to frame a silhouette.
-   - For intimate/trapped: Design an ENCLOSURE using a repetitive textural backdrop or environment that wraps around the character.
-   - For quiet/nostalgic: Design a piece of MUNDANE REALISM focusing on a still, textured, highly human vignette.
-3. WRITE THE BRIEF: Describe the scene with intense focus on lighting, texture, and character posture. Do not use generic filler or mention the name of the archetype. Output ONLY the 2-3 sentence visual description.`;
+    const features = upload.audio_features || {};
+    const promptText = generateDirectorPrompt(basic_input, features);
     
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
-        maxOutputTokens: 300,
-        temperature: 0.75,
+        maxOutputTokens: 250,
+        temperature: 0.72,
       },
     });
 
@@ -220,42 +223,29 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'Audio analysis must complete before generating art' })
     }
 
-    // FIXED: Corrected mapping function signature name error
     const visualBrief = audioFeaturesToVisualDescription(upload.audio_features)
     const rawInputText = lyric_context || upload.sentence_prompt || "Abstract emotion"
 
     let expandedBrief = rawInputText
 
-    // FIXED: Point to the new engine identifier system layout string
+    // INLINE EXPANSION LOGIC
     if (!rawInputText.includes("AESTHETIC_SYSTEM_PROMPT") && rawInputText.length < 150) {
       try {
         console.log(`[INLINE EXPANSION ENGINE] Processing raw descriptor: "${rawInputText}"`)
-        const promptText = `You are an elite creative director specializing in conceptual single cover art design. Your job is to transform a raw user text input into a highly evocative, 2-3 sentence visual description by mapping the underlying emotion to a structural composition type.
-
-The artist's basic input: "${rawInputText.trim()}"
-Track Audio Data: ${upload.audio_features?.bpm || 90} BPM, Mood: ${upload.audio_features?.mood || 'Atmospheric'}.
-
-INSTRUCTIONS:
-1. IDENTIFY THE EMOTIONAL CORE: Determine if the input feels internal/conflicted, grand/isolated, intimate/trapped, or quiet/nostalgic.
-2. CHOOSE A STRUCTURAL VEHICLE:
-   - For internal/conflicted: Design a SURREAL METAPHOR where a physical object or condition represents their mind state.
-   - For grand/isolated: Design a MONUMENTAL SCALE scene using an immense backdrop (a giant sun, towering cloud, vast sky) to frame a silhouette.
-   - For intimate/trapped: Design an ENCLOSURE using a repetitive textural backdrop or environment that wraps around the character.
-   - For quiet/nostalgic: Design a piece of MUNDANE REALISM focusing on a still, textured, highly human vignette.
-3. WRITE THE BRIEF: Describe the scene with intense focus on lighting, texture, and character posture. Do not use generic filler or mention the name of the archetype. Output ONLY the 2-3 sentence visual description.`;
+        const promptText = generateDirectorPrompt(rawInputText, upload.audio_features || {});
 
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: promptText,
-          config: { maxOutputTokens: 250, temperature: 0.75 },
+          config: { maxOutputTokens: 250, temperature: 0.72 },
         })
 
         if (geminiResponse.text?.trim()) {
           expandedBrief = geminiResponse.text.trim()
         }
       } catch (gErr) {
-        // BULLETPROOF FALLBACK: Silently fall back to utilizing the raw text description if Gemini 503s
-        console.error('⚠️ Inline expansion caught Gemini outage, falling back seamlessly to raw user string:', gErr.message || gErr)
+        // FALLBACK: If Gemini errors out or hits a 503, seamlessly pass the raw string directly down the pipe
+        console.error('⚠️ Inline expansion caught an error, falling back to raw user string:', gErr.message || gErr)
         expandedBrief = rawInputText.trim()
       }
     }
@@ -388,7 +378,6 @@ router.patch('/refine', requireAuth, async (req, res) => {
     const upload = uploadResult.data;
     const artistProfile = profileResult.data || {};
     
-    // FIXED: Swapped signature call to utilize correct visual mapping function layout
     const visualDescription = upload.audio_features 
       ? audioFeaturesToVisualDescription(upload.audio_features)
       : `Audio properties mapped to standard creative profile layout variables.`;
