@@ -102,9 +102,9 @@ Rules:
       model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
-        maxOutputTokens: 300,
-        temperature: 0.75,
-      },
+      maxOutputTokens: 1024,  // was 300
+      temperature: 0.75,
+     },
     });
 
     const expanded = response.text?.trim();
@@ -246,7 +246,7 @@ INSTRUCTIONS:
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: promptText,
-          config: { maxOutputTokens: 250, temperature: 0.75 },
+          config: { maxOutputTokens: 1024, temperature: 0.75 },  // was 250
         })
 
         if (geminiResponse.text?.trim()) {
