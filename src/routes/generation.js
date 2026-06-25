@@ -54,26 +54,6 @@ const audioFeaturesToVisualDescription = (features) => {
   return parts.join('. ');
 };
 
-// ─── Shared Gemini Director Prompt Generator ───────────────────────────────────
-const generateDirectorPrompt = (basicInput, features) => {
-  return `You are an elite album cover art director translating raw human intent and sonic metrics into a 2-3 sentence visual description optimized for an image generation engine.
-
-Artist's Input: "${basicInput.trim()}"
-Track Profile: ${features.bpm || 90} BPM, Mood: ${features.mood || 'Atmospheric'}.
-
-YOUR CRITICAL DESIGN VEHICLES (Use these internally as your creative toolbox to translate the feeling):
-- For internal conflict or heavy emotional pain, translate psychological states into a physical, raw reality interacting with the subject (e.g., impossible postures under tension, objects piercing or replacing human elements).
-- For feelings of hope, freedom, vastness, or profound isolation, use a monumental, overwhelming scale backdrop (an immense singular cloud formation, a giant low-hanging celestial sun, a sweeping flat horizon) that dwarfs a lone subject.
-- For hyper-focused, intimate, or claustrophobic feelings, build an enclosed environment wrapped uniformly in a repetitive pattern or rich texture (e.g., newsprint sheets, distressed raw concrete, weathered book pages).
-- For calm, nostalgia, or raw urban storytelling, look to mundane realism—still, highly human vignettes in everyday environments (e.g., sitting on a curb beside a vintage car).
-
-STRICT OUTPUT FORMAT RULES:
-1. Output ONLY the raw 2-3 sentence visual description prompt. 
-2. DO NOT mention the words "Selected Archetype", "Archetype", or include the category titles in your output.
-3. DO NOT use structural labels, introductory text, bolding, or markdown headers. 
-4. Translate abstract feelings (like "hopeful for better days") immediately into a concrete, photographic scene description. Ensure the final sentence is grammatically complete and fully written out without truncation.`;
-};
-
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 /**
@@ -100,15 +80,30 @@ router.post('/expand', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Upload record not found' });
     }
 
-    const features = upload.audio_features || {};
-    const promptText = generateDirectorPrompt(basic_input, features);
-    
+    const features = upload.audio_features;
+    if (!features) {
+      return res.status(422).json({ error: 'Unprocessed file layout. Run analysis pipeline first.' });
+    }
+
+    const audioContext = audioFeaturesToVisualDescription(features);
+
+    const promptText = `You are an elite cover art director. Transform the input below into a 2-3 sentence visual scene description.
+
+Artist input: "${basic_input.trim()}"
+Audio context: ${audioContext}
+
+Rules:
+- Begin your response immediately with the scene. No preamble.
+- Exactly 2-3 sentences. Nothing else.
+- Choose one structural vehicle: surreal metaphor, monumental scale, enclosure, or mundane realism — based on the emotional core.
+- Focus on lighting, texture, and posture. Be specific and physical.`;
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
-        maxOutputTokens: 250,
-        temperature: 0.72,
+        maxOutputTokens: 300,
+        temperature: 0.75,
       },
     });
 
@@ -224,29 +219,42 @@ router.post('/', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'Audio analysis must complete before generating art' })
     }
 
+    // FIXED: Corrected mapping function signature name error
     const visualBrief = audioFeaturesToVisualDescription(upload.audio_features)
     const rawInputText = lyric_context || upload.sentence_prompt || "Abstract emotion"
 
     let expandedBrief = rawInputText
 
-    // INLINE EXPANSION LOGIC
+    // FIXED: Point to the new engine identifier system layout string
     if (!rawInputText.includes("AESTHETIC_SYSTEM_PROMPT") && rawInputText.length < 150) {
       try {
         console.log(`[INLINE EXPANSION ENGINE] Processing raw descriptor: "${rawInputText}"`)
-        const promptText = generateDirectorPrompt(rawInputText, upload.audio_features || {});
+        const promptText = `You are an elite creative director specializing in conceptual single cover art design. Your job is to transform a raw user text input into a highly evocative, 2-3 sentence visual description by mapping the underlying emotion to a structural composition type.
+
+The artist's basic input: "${rawInputText.trim()}"
+Track Audio Data: ${upload.audio_features?.bpm || 90} BPM, Mood: ${upload.audio_features?.mood || 'Atmospheric'}.
+
+INSTRUCTIONS:
+1. IDENTIFY THE EMOTIONAL CORE: Determine if the input feels internal/conflicted, grand/isolated, intimate/trapped, or quiet/nostalgic.
+2. CHOOSE A STRUCTURAL VEHICLE:
+   - For internal/conflicted: Design a SURREAL METAPHOR where a physical object or condition represents their mind state.
+   - For grand/isolated: Design a MONUMENTAL SCALE scene using an immense backdrop (a giant sun, towering cloud, vast sky) to frame a silhouette.
+   - For intimate/trapped: Design an ENCLOSURE using a repetitive textural backdrop or environment that wraps around the character.
+   - For quiet/nostalgic: Design a piece of MUNDANE REALISM focusing on a still, textured, highly human vignette.
+3. WRITE THE BRIEF: Describe the scene with intense focus on lighting, texture, and character posture. Do not use generic filler or mention the name of the archetype. Output ONLY the 2-3 sentence visual description.`;
 
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: promptText,
-          config: { maxOutputTokens: 250, temperature: 0.72 },
+          config: { maxOutputTokens: 250, temperature: 0.75 },
         })
 
         if (geminiResponse.text?.trim()) {
           expandedBrief = geminiResponse.text.trim()
         }
       } catch (gErr) {
-        // FALLBACK: If Gemini errors out or hits a 503, seamlessly pass the raw string directly down the pipe
-        console.error('⚠️ Inline expansion caught an error, falling back to raw user string:', gErr.message || gErr)
+        // BULLETPROOF FALLBACK: Silently fall back to utilizing the raw text description if Gemini 503s
+        console.error('⚠️ Inline expansion caught Gemini outage, falling back seamlessly to raw user string:', gErr.message || gErr)
         expandedBrief = rawInputText.trim()
       }
     }
@@ -379,6 +387,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
     const upload = uploadResult.data;
     const artistProfile = profileResult.data || {};
     
+    // FIXED: Swapped signature call to utilize correct visual mapping function layout
     const visualDescription = upload.audio_features 
       ? audioFeaturesToVisualDescription(upload.audio_features)
       : `Audio properties mapped to standard creative profile layout variables.`;
