@@ -102,7 +102,6 @@ Rules:
       model: 'gemini-2.5-flash',
       contents: promptText,
       config: {
-      maxOutputTokens: 1024,  // was 300
       temperature: 0.75,
      },
     });
@@ -246,14 +245,14 @@ INSTRUCTIONS:
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
           contents: promptText,
-          config: { maxOutputTokens: 1024, temperature: 0.75 },  // was 250
+          config: { temperature: 0.75 },  // was 250
         })
 
         if (geminiResponse.text?.trim()) {
           expandedBrief = geminiResponse.text.trim()
         }
       } catch (gErr) {
-        // BULLETPROOF FALLBACK: Silently fall back to utilizing the raw text description if Gemini 503s
+        
         console.error('⚠️ Inline expansion caught Gemini outage, falling back seamlessly to raw user string:', gErr.message || gErr)
         expandedBrief = rawInputText.trim()
       }
