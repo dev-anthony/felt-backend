@@ -1,4 +1,3 @@
-
 const express = require('express')
 const router = express.Router()
 const multer = require('multer')
@@ -8,7 +7,7 @@ const crypto = require('crypto')
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB — matches spec
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
   fileFilter: (req, file, cb) => {
     const allowed = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/wave']
     const extAllowed = file.originalname.endsWith('.mp3') || file.originalname.endsWith('.wav')
@@ -21,14 +20,7 @@ const upload = multer({
   }
 })
 
-/**
- * POST /api/uploads
- * Header: Authorization: Bearer <access_token>
- * Body: multipart/form-data
- * - audio: File (MP3 or WAV, max 20MB)
- * - title: string (required)
- * - sentence_prompt: string (required) — "what is this track about in one sentence"
- */
+
 router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No audio file provided' })
@@ -54,7 +46,7 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
   const storagePath = `${userId}/${trackId}.${ext}`
 
   try {
-    // 1. Store the audio file
+    // 1. Store the audio file in the cloud bucket
     const { data: storageData, error: storageError } = await supabase.storage
       .from('audio-uploads')
       .upload(storagePath, req.file.buffer, {
@@ -67,12 +59,12 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
       return res.status(500).json({ error: 'Audio upload failed. Please try again.' })
     }
 
-    // Get public URL — stored for later use in Whisper transcription etc.
+    // Get public accessible asset URL
     const { data: { publicUrl } } = supabase.storage
       .from('audio-uploads')
       .getPublicUrl(storageData.path)
 
-    // 2. Create the track record
+    // 2. Create the raw uncompleted database record footprint
     const { data: track, error: dbError } = await supabase
       .from('uploads')
       .insert({
@@ -80,23 +72,22 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
         user_id: userId,
         title: title.trim(),
         sentence_prompt: sentence_prompt.trim(),
-        track_type,                  // 'vocal' | 'instrumental'
+        track_type,
         storage_path: storageData.path,
         audio_url: publicUrl,
-        status: 'uploaded',          // uploaded → analyzed → generating → complete
+        status: 'uploaded',
         created_at: new Date().toISOString(),
       })
       .select()
       .single()
 
     if (dbError) {
-      // Audio is in storage but DB insert failed — clean up to avoid orphans
+      // Rollback file upload if database instantiation fails
       await supabase.storage.from('audio-uploads').remove([storagePath])
       console.error('Track record insert failed:', dbError.message)
       return res.status(500).json({ error: 'Failed to save track. Please try again.' })
     }
 
-    // 3. Tell the frontend which pipeline to run next
     const pipeline_hint = track_type === 'vocal' ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
 
     return res.status(201).json({
@@ -110,20 +101,10 @@ router.post('/', requireAuth, upload.single('audio'), async (req, res) => {
   }
 })
 
-/**
- * POST /api/uploads/:id/analysis
- * Body: {
- * bpm, key, scale, energy, valence, danceability,
- * acousticness, spectral_brightness, loudness, mood, speechiness, genre
- * }
- *
- * Captures structural relational data payloads from client-side vector clusters.
- */
+
 router.post('/:id/analysis', requireAuth, async (req, res) => {
   const { id } = req.params
   const userId = req.user.id
-
-  // Defensive: accept either a flat body or one nested under `features`
   const payload = req.body.features ?? req.body
 
   const {
@@ -131,7 +112,6 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
     acousticness, spectral_brightness, loudness, mood, speechiness, genre
   } = payload
 
-  // Validate presence of relational data matrix components
   const required = { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood }
   const missing = Object.entries(required).filter(([, v]) => v === undefined || v === null).map(([k]) => k)
 
@@ -140,7 +120,6 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
   }
 
   try {
-    // Verify this upload belongs to this user
     const { data: existing, error: fetchError } = await supabase
       .from('uploads')
       .select('id, track_type, status')
@@ -156,23 +135,14 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
       return res.status(409).json({ error: 'Analysis already submitted for this track' })
     }
 
-    // Save features and advance status
     const { data: updated, error: updateError } = await supabase
       .from('uploads')
       .update({
         audio_features: {
-          bpm, 
-          key, 
-          scale, 
-          energy, 
-          valence, 
-          danceability,
-          acousticness, 
-          spectral_brightness, // Handles your frontend object format cleanly
-          loudness, 
-          mood,
+          bpm, key, scale, energy, valence, danceability,
+          acousticness, spectral_brightness, loudness, mood,
           speechiness: speechiness ?? null,
-          genre: genre ?? 'hip-hop' // Stores culture indicators directly for prompt crafting
+          genre: genre ?? 'hip-hop'
         },
         status: 'analyzed',
       })
@@ -185,7 +155,6 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to save analysis.' })
     }
 
-    // Resolve pipeline based on verified speechiness metric thresholds
     let resolvedHint
     if (speechiness !== undefined && speechiness !== null) {
       resolvedHint = speechiness > 40 ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
@@ -204,7 +173,6 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
   }
 })
 
-// ─── UPDATED GET ROUTE WITH NESTED RELATIONSHIP ORDERING ───────────────────────────────────
 router.get('/', requireAuth, async (req, res) => {
   const userId = req.user.id
   const limit = Math.min(parseInt(req.query.limit) || 20, 50)
@@ -214,25 +182,14 @@ router.get('/', requireAuth, async (req, res) => {
     const { data, error, count } = await supabase
       .from('uploads')
       .select(`
-        id,
-        title,
-        track_type,
-        status,
-        audio_url,
-        audio_features,
-        sentence_prompt,
-        created_at,
+        id, title, track_type, status, audio_url, audio_features, sentence_prompt, created_at,
         generations:generations!upload_id (
-          id,
-          image_url,
-          status,
-          created_at,
-          prompt_used
+          id, image_url, status, created_at, prompt_used
         )
       `, { count: 'exact' })
       .eq('user_id', userId)
+      .eq('status', 'complete') 
       .order('created_at', { ascending: false })
-      // FIX: Force the generations subarray rows to sort newest first
       .order('created_at', { foreignTable: 'generations', ascending: false }) 
       .range(offset, offset + limit - 1)
 
@@ -254,6 +211,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 })
 
+
 router.get('/:id', requireAuth, async (req, res) => {
   const { id } = req.params
   const userId = req.user.id
@@ -262,35 +220,24 @@ router.get('/:id', requireAuth, async (req, res) => {
     const { data, error } = await supabase
       .from('uploads')
       .select(`
-        id,
-        title,
-        track_type,
-        status,
-        audio_url,
-        audio_features,
-        sentence_prompt,
-        created_at,
+        id, title, track_type, status, audio_url, audio_features, sentence_prompt, created_at,
         generations:generations!upload_id (
-          id,
-          image_url,
-          prompt_used,
-          status,
-          created_at
+          id, image_url, prompt_used, status, created_at
         )
       `)
       .eq('id', id)
       .eq('user_id', userId)
+      .eq('status', 'complete') 
       .single()
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Upload not found' })
+        return res.status(404).json({ error: 'Upload not found or is currently being processed.' })
       }
       console.error('Upload fetch failed:', error.message)
       return res.status(500).json({ error: 'Failed to load upload.' })
     }
 
-    // Sort generations descending right here to guarantee latest is first in array index
     if (data.generations && data.generations.length > 0) {
       data.generations.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     }
@@ -302,4 +249,36 @@ router.get('/:id', requireAuth, async (req, res) => {
     return res.status(500).json({ error: 'Something went wrong.' })
   }
 })
-module.exports = router
+
+
+router.delete('/:id', requireAuth, async (req, res) => {
+  const { id } = req.params
+  const userId = req.user.id
+
+  try {
+    // Drop the row directly. The database handles file storage destruction under the hood.
+    const { data, error } = await supabase
+      .from('uploads')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select()
+
+    if (error) {
+      console.error('[DB PURGE FAULT]:', error.message)
+      return res.status(500).json({ error: 'Failed to clear database references.' })
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Asset not found or unauthorized deletion request.' })
+    }
+
+    return res.status(200).json({ message: 'Upload asset and associated storage file successfully destroyed.' })
+
+  } catch (err) {
+    console.error('DELETE route crash:', err)
+    return res.status(500).json({ error: 'Internal processing route fault during deletion sequence.' })
+  }
+})
+
+module.exports = router;
