@@ -180,10 +180,6 @@ router.post('/transcribe', requireAuth, async (req, res) => {
   }
 })
 
-/**
- * POST /api/generations
- * Primary generation route with bulletproof Gemini 503 fallback built-in
- */
 router.post('/', requireAuth, async (req, res) => {
   const { upload_id, lyric_context } = req.body
   const userId = req.user.id
