@@ -13,6 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@deepgram/sdk": "^5.4.0",
     "@google/genai": "^2.9.0",
     "@huggingface/inference": "^4.13.19",
     "@supabase/supabase-js": "^2.108.1",
@@ -21,6 +22,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "genius-lyrics-api": "^3.2.1",
     "multer": "^2.1.1",
     "openai": "^6.44.0",
     "replicate": "^1.4.0"
