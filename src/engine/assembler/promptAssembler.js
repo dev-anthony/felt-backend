@@ -1,0 +1,121 @@
+'use strict'
+/**
+ * PROMPT ASSEMBLER — FELT's compiler.
+ *
+ * Deterministic. Contains almost no creative logic: it takes decisions that
+ * were already made (the scene blueprint from Gemini, the fragments from the
+ * Visual DNA, the technique suffix) and welds them into one coherent FLUX
+ * prompt in a fixed order. Given the same inputs it always returns the same
+ * string.
+ *
+ * Fixed assembly order (front-loaded so FLUX commits to a real photographic
+ * look before it reads the story):
+ *   medium/editorial/graphic → subject+wardrobe+pose+expression → action+env →
+ *   camera+lens+film → lighting → motion → composition+typography → color →
+ *   texture+post → symbolism → technique suffix → quality guardrails
+ */
+
+const { getSuffix } = require('../technique')
+const { getConcept } = require('../vocabulary')
+
+const QUALITY_TAIL_PHOTO =
+  'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+  'Intentional, moody and authentic — real camera capture, real skin pores and textile weave, ' +
+  'zero digital smoothing, zero plastic AI skin, zero CGI compositing artifacts, no floating neon, ' +
+  'no text or logos rendered in the image.'
+
+const QUALITY_TAIL_ILLUSTRATION =
+  'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+  'Handmade print aesthetic with visible tactile ink/paper imperfection, ' +
+  'zero glossy digital gradients, zero plastic AI smoothing, no text or logos rendered in the image.'
+
+// Non-photographic mediums whose presence must suppress the camera/film chain,
+// otherwise the prompt says both "screen-print" and "shot on a film camera".
+const NON_PHOTO_TAGS = ['risograph', 'screenprint', 'collage', 'painterly', 'oil', 'illustration', 'print']
+
+function isPhotographicMedium(dna) {
+  const sel = dna.selections.artMedium
+  if (!sel) return true
+  const concept = getConcept(sel.conceptId)
+  const tags = (concept && concept.tags) || []
+  if (tags.includes('photo') || tags.includes('default')) return true
+  return !tags.some((t) => NON_PHOTO_TAGS.includes(t))
+}
+
+function frag(dna, key) {
+  const s = dna.selections[key]
+  return s && s.fragment ? s.fragment.trim() : ''
+}
+
+// Join non-empty parts into one sentence, ", "-separated, single trailing stop.
+function sentence(parts) {
+  const clean = parts.map((p) => (p || '').trim()).filter(Boolean)
+  if (clean.length === 0) return ''
+  return clean.join(', ').replace(/\s+/g, ' ').replace(/,\s*,/g, ',') + '.'
+}
+
+/**
+ * @param {object} args
+ * @param {import('../types').SceneBlueprint} args.blueprint
+ * @param {import('../types').VisualDNA} args.dna
+ * @returns {import('../types').AssembledPrompt}
+ */
+function assemblePrompt({ blueprint, dna }) {
+  const b = blueprint || {}
+  const technique = dna.technique
+
+  // Symbolism: prefer the concrete object Gemini staged; fall back to the DNA
+  // motif only when the DNA actually proposed one (not sym_none).
+  const dnaSymbolism = dna.selections.symbolism
+  const blueprintSym = b.symbolism && b.symbolism.toLowerCase() !== 'none' ? b.symbolism : ''
+  const dnaSym = dnaSymbolism && dnaSymbolism.conceptId !== 'sym_none' ? dnaSymbolism.fragment : ''
+  const symbolism = blueprintSym || dnaSym
+
+  const photographic = isPhotographicMedium(dna)
+
+  // Capture chain (camera/lens/film), grain texture and exposure-based motion
+  // only make sense for a real photograph. For an illustrated medium they are
+  // suppressed so the prompt stays internally coherent.
+  const captureChain = photographic
+    ? sentence([frag(dna, 'camera'), frag(dna, 'lens'), frag(dna, 'filmStock')])
+    : ''
+  const motionBlock = photographic ? sentence([frag(dna, 'motion')]) : ''
+  const textureBlock = photographic
+    ? sentence([frag(dna, 'texture'), frag(dna, 'postProcessing')])
+    : sentence([frag(dna, 'postProcessing')])
+
+  const blocks = [
+    // 1. Medium / editorial / graphic framing
+    sentence([frag(dna, 'artMedium'), frag(dna, 'editorial'), frag(dna, 'graphic')]),
+    // 2. Subject
+    sentence([b.subject, b.wardrobe, b.pose, b.expression]),
+    // 3. Action + environment
+    sentence([b.sceneAction, frag(dna, 'environment')]),
+    // 4. Capture chain (photographic only)
+    captureChain,
+    // 5. Lighting
+    sentence([frag(dna, 'lighting')]),
+    // 6. Motion (photographic only)
+    motionBlock,
+    // 7. Composition + typography safe zone
+    sentence([frag(dna, 'composition'), frag(dna, 'typography')]),
+    // 8. Color
+    sentence([frag(dna, 'color')]),
+    // 9. Texture + post
+    textureBlock,
+    // 10. Symbolism (optional)
+    symbolism ? sentence([symbolism]) : '',
+    // 11. Narrative beat (kept last of the story so it colors nothing technical)
+    b.narrative ? sentence([`the moment reads as ${b.narrative}`]) : '',
+    // 12. Technique suffix — verbatim from the legacy system, photographic only
+    photographic ? getSuffix(technique) : '',
+    // 13. Quality guardrails
+    photographic ? QUALITY_TAIL_PHOTO : QUALITY_TAIL_ILLUSTRATION,
+  ]
+
+  const prompt = blocks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+
+  return { prompt, technique, dna, scene: b }
+}
+
+module.exports = { assemblePrompt, QUALITY_TAIL_PHOTO, QUALITY_TAIL_ILLUSTRATION }

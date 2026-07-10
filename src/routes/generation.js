@@ -718,8 +718,34 @@ const { fetchLyricsOnline } = require('../utils/lyricsFetcher')
 const { GoogleGenAI } = require('@google/genai')
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
-const { HfInference } = require('@huggingface/inference')
-const hf = new HfInference(process.env.HF_TOKEN)
+// Image generation is provider-agnostic (see utils/imageProvider). Defaults to
+// the free, no-key Pollinations FLUX backend; switch with IMAGE_PROVIDER env
+// (pollinations | together | huggingface | replicate).
+const { generateImage, DEFAULT_PROVIDER } = require('../utils/imageProvider')
+
+// ─── FELT VISUAL OPERATING SYSTEM ─────────────────────────────────────────────
+// The Technique Layer, Visual Vocabulary, Visual DNA Engine, Gemini Compiler and
+// Prompt Assembler now live under ../engine. This route consumes them; the
+// technique suffixes it used to define inline are re-exported unchanged from the
+// engine so nothing about existing behavior shifts.
+const engine = require('../engine')
+const {
+  TECHNIQUE_SUFFIXES,
+  DEFAULT_TECHNIQUE,
+  isValidTechnique,
+} = require('../engine/technique')
+
+// Raw single-shot Gemini text call, injected into the engine's Compiler so the
+// engine stays decoupled from the SDK. Mirrors generateWithRetry's transport
+// without the technique/scene parsing (the Compiler wants raw JSON text back).
+async function geminiRawText(promptText, { temperature = 0.85 } = {}) {
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: promptText,
+    config: { temperature },
+  })
+  return response.text?.trim() || ''
+}
 
 // LAYER 1: FELT — Unified High-Concept Technique-Matched Prompt
 const AESTHETIC_SYSTEM_PROMPT = `You are a synesthetic visual artist and an elite music cover art director working for real recording artists.
@@ -796,21 +822,8 @@ Respond with exactly two lines, nothing else:
 TECHNIQUE: <one of the 10 technique names above, exact match>
 SCENE: <2-3 sentence scene description, no preamble, no quotes, no lyric excerpts, focused on composition, the specific light source, color grade, and physical posture>`;
 
-// ─── Per-technique FLUX camera/lighting suffixes ──────────────────────────────
-const TECHNIQUE_SUFFIXES = {
-  FLASH_DOCUMENTARY: 'Shot on a compact point-and-shoot with direct on-camera flash, slightly overexposed skin tones, hard graphic shadow cast behind the subject, visible grain, cluttered candid environment.',
-  VINTAGE_FILM_NOSTALGIA: 'Shot on grainy 35mm film with warm halation around highlights, slightly faded lifted blacks, nostalgic analog color cast, visible film grain throughout.',
-  SILHOUETTE_ATMOSPHERE: 'Shot with the subject rim-lit against atmospheric haze or night light, deep crushed shadow detail, visible grain, dramatic negative space.',
-  SURREAL_PRACTICAL_METAPHOR: 'Shot as an in-camera practical effect with real physical props, correct object weight and cast shadows, raw documentary lighting, visible film grain, zero CGI compositing artifacts.',
-  DUOTONE_COLOR_WASH: 'Shot on film and printed with a single dominant color-gel wash across the entire frame, grain and texture visible underneath the color cast.',
-  MACRO_INTIMATE_DETAIL: 'Shot in extreme macro close-up with shallow depth of field, soft natural falloff, real visible skin pores and texture, no airbrushing.',
-  MOTION_BLUR_STROBE: 'Shot with a slow shutter and a single strobe pop, real directional motion blur trails, one sharp frozen instant, visible grain.',
-  MIRROR_DOUBLE_EXPOSURE: 'Shot as a real in-camera double exposure with slight misalignment and ghosting between the two layers, visible grain throughout.',
-  STUDIO_SEAMLESS_EDITORIAL: 'Shot in-studio against a saturated seamless paper backdrop with direct flash or hard strip lighting, gritty real skin texture, no glossy catalog smoothing.',
-  MONUMENTAL_SCALE_ISOLATION: 'Shot with a wide lens to emphasize scale imbalance between the tiny subject (or empty scene) and the massive dominant element, flat even lighting on the large element, visible grain, real atmospheric depth and haze, minimal competing detail.',
-}
-
-const DEFAULT_TECHNIQUE = 'SILHOUETTE_ATMOSPHERE'
+// TECHNIQUE_SUFFIXES and DEFAULT_TECHNIQUE are now imported from ../engine/technique
+// (see requires above) — same 10 techniques, same suffix strings, just modular.
 
 // Parses the model's "TECHNIQUE: X / SCENE: Y" response. Falls back gracefully
 // if the model doesn't follow the format exactly, so a malformed response never
@@ -835,9 +848,51 @@ function parseSceneResponse(rawText, fallbackScene) {
   return { technique: validTechnique, scene }
 }
 
+// LEGACY fallback — the pre-engine prompt shape. Retained only as a safety net
+// if the Visual DNA Engine ever throws; every live path now uses buildFinalPrompt.
 function buildFluxPrompt(technique, scene) {
   const suffix = TECHNIQUE_SUFFIXES[technique] || TECHNIQUE_SUFFIXES[DEFAULT_TECHNIQUE]
   return `${scene}. ${suffix} Definitively moody, intentional, and authentic — zero digital smoothing, zero CGI artifacts, zero plastic AI skin.`
+}
+
+/**
+ * Builds the final FLUX prompt through the Visual Operating System.
+ *
+ * The technique (storytelling) and scene (already-written story) are resolved
+ * exactly as before. Here they're routed through the Visual DNA Engine, which
+ * computes the full photographic execution (camera/lens/film/lighting/color/
+ * composition/…) deterministically from the track's audio features, then the
+ * Prompt Assembler welds everything into one coherent prompt.
+ *
+ * Two modes:
+ *  - deterministic (default): the resolved `scene` sentence becomes the story
+ *    block; no extra LLM call, same song → same prompt.
+ *  - compiler (useCompiler): Gemini is called ONCE as a constrained Prompt
+ *    Compiler to emit a structured scene blueprint that fits the DNA, then
+ *    assembled. Falls back to the deterministic path on any failure.
+ *
+ * Any engine error degrades safely to the legacy buildFluxPrompt.
+ */
+async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood } = {}) {
+  try {
+    if (useCompiler) {
+      const result = await engine.orchestrate({
+        generate: geminiRawText,
+        features,
+        techniqueName: technique,
+        userFeeling: userFeeling || scene,
+        lyricsTheme: scene,
+        mood,
+        fallbackScene: scene,
+      })
+      return { prompt: result.prompt, technique: result.technique, dna: result.dna }
+    }
+    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene })
+    return { prompt: built.prompt, technique: built.technique, dna: built.dna }
+  } catch (err) {
+    console.warn(`[ENGINE] Visual DNA build failed, using legacy prompt: ${err?.message || err}`)
+    return { prompt: buildFluxPrompt(technique, scene), technique, dna: null }
+  }
 }
 
 // ─── Scene safety filter ──────────────────────────────────────────────────────
@@ -1291,27 +1346,33 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    const absoluteFluxPrompt = buildFluxPrompt(technique, scene)
+    // Route through the Visual Operating System: Visual DNA (deterministic from
+    // audio_features) + Prompt Assembler. Pass use_compiler: true in the request
+    // body to additionally run the Gemini Prompt Compiler for a DNA-constrained
+    // structured scene.
+    const { prompt: absoluteFluxPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+      useCompiler: req.body.use_compiler === true,
+      mood: upload.audio_features?.mood,
+    })
 
     const generationId = crypto.randomUUID()
     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id)
 
-    console.log(`[HF-FLUX-ENGINE] Launching Serverless Inference Pipeline for ID: ${generationId} technique=${technique}`)
+    console.log(`[IMAGE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline for ID: ${generationId} technique=${technique}`)
 
     let imagePayloadUrl
     try {
-      const responseBlob = await hf.textToImage({
-        model: 'black-forest-labs/FLUX.1-dev',
-        inputs: absoluteFluxPrompt,
-        parameters: { width: 1024, height: 1024 }
-      })
-
-      const buffer = Buffer.from(await responseBlob.arrayBuffer())
-      imagePayloadUrl = `data:image/webp;base64,${buffer.toString('base64')}`
+      imagePayloadUrl = await generateImage(absoluteFluxPrompt, { width: 1024, height: 1024 })
     } catch (hfErr) {
-      console.error('[HF GENERATION EXCEPTION MATRIX CRASH]:', hfErr?.message || hfErr)
+      const detail = hfErr?.message || String(hfErr)
+      console.error('[HF GENERATION EXCEPTION MATRIX CRASH]:', detail)
       await supabase.from('uploads').update({ status: 'analyzed' }).eq('id', upload_id)
-      return res.status(502).json({ error: 'Hugging Face image pipeline failed.' })
+      // Surface quota/credit exhaustion distinctly so the UI can tell the user
+      // to top up credits rather than showing a generic "try again" failure.
+      if (/credit|quota|depleted|PRO to get|payment required/i.test(detail)) {
+        return res.status(402).json({ error: 'Image provider credits exhausted.', detail })
+      }
+      return res.status(502).json({ error: 'Hugging Face image pipeline failed.', detail })
     }
 
     let permanentUrl
@@ -1436,7 +1497,10 @@ INPUT REFINEMENT VARIABLES:
       scene = lyric_context.trim()
     }
 
-    const absoluteFluxRefinedPrompt = buildFluxPrompt(technique, scene);
+    const { prompt: absoluteFluxRefinedPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+      useCompiler: req.body.use_compiler === true,
+      mood: upload.audio_features?.mood,
+    });
 
     const generationId = crypto.randomUUID();
     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id);
@@ -1445,18 +1509,15 @@ INPUT REFINEMENT VARIABLES:
 
     let imagePayloadUrl;
     try {
-      const responseBlob = await hf.textToImage({
-        model: 'black-forest-labs/FLUX.1-dev',
-        inputs: absoluteFluxRefinedPrompt,
-        parameters: { width: 1024, height: 1024 }
-      });
-
-      const buffer = Buffer.from(await responseBlob.arrayBuffer());
-      imagePayloadUrl = `data:image/webp;base64,${buffer.toString('base64')}`;
+      imagePayloadUrl = await generateImage(absoluteFluxRefinedPrompt, { width: 1024, height: 1024 });
     } catch (hfErr) {
-      console.error('❌ [HF REFINEMENT PIPELINE FAULT]:', hfErr?.message || hfErr);
+      const detail = hfErr?.message || String(hfErr)
+      console.error('❌ [HF REFINEMENT PIPELINE FAULT]:', detail);
       await supabase.from('uploads').update({ status: 'complete' }).eq('id', upload_id);
-      return res.status(502).json({ error: 'Hugging Face image refinement loop engine timed out.' });
+      if (/credit|quota|depleted|PRO to get|payment required/i.test(detail)) {
+        return res.status(402).json({ error: 'Image provider credits exhausted.', detail });
+      }
+      return res.status(502).json({ error: 'Hugging Face image refinement loop engine timed out.', detail });
     }
 
     let permanentUrl;
