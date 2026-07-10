@@ -256,7 +256,24 @@ router.delete('/:id', requireAuth, async (req, res) => {
   const userId = req.user.id
 
   try {
-    // Drop the row directly. The database handles file storage destruction under the hood.
+    // Fetch storage_path first so we can clean up the actual file via the
+    // Storage API afterward. NEVER rely on a DB-level trigger to cascade-delete
+    // storage.objects directly via raw SQL — Supabase blocks that outright
+    // ("Direct deletion from storage tables is not allowed. Use the Storage
+    // API instead."), and since triggers run in the same transaction as the
+    // DELETE, that rejection rolls back the whole row deletion too. That is
+    // exactly the fault in the [DB PURGE FAULT] log below.
+    const { data: existing, error: fetchError } = await supabase
+      .from('uploads')
+      .select('id, storage_path')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .single()
+
+    if (fetchError || !existing) {
+      return res.status(404).json({ error: 'Asset not found or unauthorized deletion request.' })
+    }
+
     const { data, error } = await supabase
       .from('uploads')
       .delete()
@@ -273,10 +290,24 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Asset not found or unauthorized deletion request.' })
     }
 
+    // Explicitly remove the audio file through the Storage API now that the
+    // DB row is confirmed gone. If this fails, the user-facing delete has
+    // already succeeded — log loudly so an orphaned file can be cleaned up
+    // manually or by a scheduled sweep, but don't fail the request over it.
+    if (existing.storage_path) {
+      const { error: storageError } = await supabase.storage
+        .from('audio-uploads')
+        .remove([existing.storage_path])
+
+      if (storageError) {
+        console.error('[STORAGE CLEANUP FAULT]:', storageError.message, '— orphaned file at:', existing.storage_path)
+      }
+    }
+
     return res.status(200).json({ message: 'Upload asset and associated storage file successfully destroyed.' })
 
   } catch (err) {
-    console.error('DELETE route crash:', err)
+    console.error('DELETE route crash:', err?.message || err)
     return res.status(500).json({ error: 'Internal processing route fault during deletion sequence.' })
   }
 })
