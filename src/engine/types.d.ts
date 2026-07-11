@@ -112,6 +112,7 @@ export interface VisualDNA {
 export interface SceneBlueprint {
   subject: string;
   wardrobe: string;
+  environment?: string;
   pose: string;
   expression: string;
   sceneAction: string;

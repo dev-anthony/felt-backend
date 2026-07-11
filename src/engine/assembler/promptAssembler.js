@@ -82,11 +82,12 @@ function assemblePrompt({ blueprint, dna, allowGroup = false }) {
     // 2. Subject — STORY-owned (from the blueprint), never the DNA archetype,
     //    so we never describe two different subjects in one prompt.
     sentence([b.subject, b.wardrobe, b.pose, b.expression]),
-    // 3. Action + setting — STORY-owned. The scene already names the location,
-    //    so the DNA `environment` selection is intentionally NOT emitted here
-    //    (it would add a second, conflicting setting). The DNA environment still
-    //    informs the Gemini compiler as a soft styling constraint.
-    sentence([b.sceneAction]),
+    // 3. Setting + action — STORY-owned. The compiler supplies a specific
+    //    `environment`; the deterministic path folds the location into
+    //    `sceneAction`. The DNA `environment` selection is intentionally NOT
+    //    emitted (it would add a second, conflicting setting); it only informs
+    //    the compiler as a soft styling constraint.
+    sentence([b.environment, b.sceneAction]),
     // 4. Capture chain (photographic only)
     captureChain,
     // 5. Lighting

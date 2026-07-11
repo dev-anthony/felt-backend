@@ -47,12 +47,15 @@ RULES:
 - Return ONLY minified JSON, no prose, no markdown fences.
 - Describe ONE subject only. Never two people touching, embracing, kissing, or in romantic/sexual contact — translate any such energy through a single figure's expression, posture, distance, or the symbolic motif instead.
 - Do NOT mention cameras, lenses, film, lighting, grain, color grading, composition, or motion — those are locked and handled by the art department.
-- Keep the subject and environment consistent with the locked styling above.
-- CONSTRUCT A REAL PERSON, not a vague type. Give concrete physical facts: approximate age, build, skin tone/undertone, hair texture and exact styling, specific garments with fabric and color, a defining accessory, and a real expression. BANNED vague words: "beautiful", "stunning", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone". Replace each with tangible detail.
-- Concrete and physical, not abstract or poetic. No metaphors in the phrasing.
+- CHOOSE WHO fits this song — do NOT default to a young woman. Pick the gender, an age that fits (teen, 20s, 30s-40s, elder), body type and cultural context from the song. Then make them MEMORABLE with one distinctive marker (a fade/shaved lines, box braids, locs, a durag, gap/gold tooth, nose ring, face/hand tattoo, scar, freckles, cultural jewelry, a signature hat) — someone specific, not a stock model.
+- Dress them in SPECIFIC interesting clothing with real fabric/cut (aso-oke, velvet, wax-print, metallic bomber, mesh, leather, handwoven knit) — never "a black top".
+- Set a SPECIFIC named location with atmosphere and one or two meaningful props — never "a dimly lit room".
+- Show ACTION, not a static pose. If the song is about movement/dancing, the body reads as in motion. Avoid "chin up, eyes closed, hand on chest".
+- Concrete and physical, not abstract or poetic. BANNED vague words: "beautiful", "stunning", "attractive", "sculptural", "high-fashion figure", "enigmatic", "a person", "someone".
+- BREVITY (important): every value is a SHORT phrase of about 8-14 words. No full sentences, no multiple clauses, no explaining. Pack in concrete nouns, not description.
 
-Return exactly this JSON shape:
-{"subject":"a tangible constructed person: age, build, skin tone, hair texture and styling","wardrobe":"specific garments with fabric+color and one defining accessory","pose":"body position, gesture, framing distance, and eye contact (e.g. chest-up, looking just off-lens)","expression":"a real facial expression","sceneAction":"what the subject is physically doing in the named setting","narrative":"the one-line emotional story of the moment","symbolism":"one physical symbolic object present, or 'none'"}`
+Return exactly this JSON shape (each value a short phrase, ~8-14 words):
+{"subject":"gender, age, skin tone, hair + one memorable marker","wardrobe":"specific garment (fabric+color) + one accessory","environment":"a specific named place + atmosphere + one prop","pose":"a moment of action/gesture + framing distance","expression":"a real facial expression","sceneAction":"what is physically HAPPENING in the moment","narrative":"one short emotional beat","symbolism":"one physical symbolic object, or 'none'"}`
 }
 
 /** Strips code fences / stray prose and parses the first JSON object found. */
@@ -74,6 +77,7 @@ function parseSceneJSON(rawText, fallback = {}) {
   const base = {
     subject: 'a single figure',
     wardrobe: 'simple modern styling',
+    environment: '',
     pose: 'mid-shot, quiet posture',
     expression: 'composed, unreadable',
     sceneAction: 'still, caught mid-thought',

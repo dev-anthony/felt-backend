@@ -104,12 +104,20 @@ STORY-ONLY RULE (CRITICAL):
 - Do NOT mention any camera, lens, film stock, lighting, shadows, rim light, color grade, hue, grain, exposure, vignette, or post-processing. A separate system already decides every one of those, and naming them here corrupts the result. Simply describe the world and the moment, the way you'd tell a friend what is happening in the photo.
 - Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy."
 
-SUBJECT CONSTRUCTION (CRITICAL — this is what makes a person look REAL, not AI):
-- When a person is in frame, build a SPECIFIC, TANGIBLE human, never a vague type. A believable cover names concrete physical facts, e.g. "a 24-year-old woman with deep brown skin and a few freckles, natural locs pulled into a loose high bun with flyaway strands, oversized square black acetate glasses, an oversized striped knit sweater in rust and cream."
-- Always specify, in plain words: approximate age, build, skin tone/undertone, hair texture and exact styling, one or two specific garments with their fabric and color, any defining accessory, and a real facial expression.
-- Give them a specific POSE and a specific GESTURE (a hand at the jaw, glancing back over a shoulder, mid-stride), and state the framing distance and whether they meet the camera's eye (e.g. "chest-up, looking just off-lens").
-- BANNED vague words — never use these to describe a person: "beautiful", "stunning", "gorgeous", "sculptural", "high-fashion figure", "enigmatic figure", "mysterious silhouette", "a person", "someone". Replace every one with concrete physical detail.
-- Faceless silhouettes are allowed ONLY when the chosen technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION; otherwise the face and features must be described and visible.
+SUBJECT CONSTRUCTION (CRITICAL — choose WHO fits the song, and make them MEMORABLE):
+- First DECIDE WHO belongs on this cover — never default to a young woman. Read the genre, mood, lyrics and feeling, then choose the gender, an age that actually fits the song (a teenager, someone in their 20s, their 30s-40s, an elder — whatever the music implies), body type, and a cultural context that matches the sound. Men, women, older people and unconventional-looking people all belong here. Vary this every time based on the track.
+- Make them MEMORABLE, not just attractive. Give ONE or TWO distinctive identity markers that make them look like SOMEBODY, not a stock model — e.g. a fade with shaved lines, box braids, locs, a durag, a shaved head, a gap tooth or gold tooth, a nose ring, a face or hand tattoo, a scar, freckles, expressive makeup, cultural jewelry, a signature hat.
+- Dress them in SPECIFIC, interesting clothing with real fabric and cut — e.g. woven aso-oke, burnt-orange velvet, wax-print tailoring, a metallic bomber, sheer mesh, layered leather, handwoven knit, a tailored suit — never a plain "black top."
+- Keep the PERSON to 2-4 vivid concrete details (who they are + one memorable marker + specific wardrobe + a real expression). Do NOT exhaustively list every feature — leave room for the world and the action below.
+- BANNED vague words for people: "beautiful", "stunning", "gorgeous", "attractive", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone". Replace each with concrete, distinctive detail.
+- Faceless silhouettes are allowed ONLY for SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION; otherwise the face and features are visible.
+
+ENVIRONMENT & MOMENT (CRITICAL — a cover is a PLACE and a MOMENT, not a floating portrait):
+- Set the scene in ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor." E.g. a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals on wooden tables, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party. Give the place genuine presence in the frame.
+- Add ONE or TWO intentional props that tell the story (a half-finished cocktail, a disco ball's scattered light, a velvet couch, a vintage microphone, drifting smoke, a cracked phone) — chosen for meaning, not clutter.
+- Describe a MOMENT OF ACTION, not a static beauty pose. Say what is HAPPENING: caught mid-step, glancing back over a shoulder, laughing, adjusting a chain, leaning off a wall, stepping through smoke. Avoid the AI-default "chin up, eyes closed, hand on chest."
+- If the song is about movement, dancing, or energy, the body MUST read as in motion — mid-sway, weight shifting, hair or fabric moving — not frozen and still.
+- BALANCE the scene: give the location, the action and the atmosphere at least as much attention as the person. Do not spend the whole scene listing appearance.
 
 SUBJECT COUNT RULE (CRITICAL):
 - Default to exactly ONE subject in frame. Do not add a second person unless the input is explicitly about a duo, group, or named collaboration.
@@ -120,7 +128,7 @@ SUBJECT COUNT RULE (CRITICAL):
 OUTPUT FORMAT (CRITICAL):
 Respond with exactly two lines, nothing else:
 TECHNIQUE: <one of the 10 technique names above, exact match>
-SCENE: <2-3 sentence concrete story grounded in this song's theme. Fully construct the subject with tangible physical detail (age, skin, hair, specific garments/fabric, accessory, expression, pose, gesture, framing distance, eye contact), name a specific setting, and include at most one symbolic object. No camera, lighting, color, or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
+SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, color or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
 
 // TECHNIQUE_SUFFIXES and DEFAULT_TECHNIQUE are now imported from ../engine/technique
 // (see requires above) — same 10 techniques, same suffix strings, just modular.
