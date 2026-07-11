@@ -27,9 +27,11 @@ const vocabulary = require('./vocabulary')
  */
 function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna }) {
   const dna = providedDna || computeVisualDNA(features, techniqueName)
-  const subjectFrag = dna.selections.subject ? dna.selections.subject.fragment : 'a single figure'
+  // The scene sentence already contains the subject AND the setting (it is the
+  // whole story), so we do NOT inject the DNA subject archetype — doing so would
+  // describe two different people in one prompt. The DNA supplies only the look.
   const blueprint = {
-    subject: subjectFrag,
+    subject: '',
     wardrobe: '',
     pose: '',
     expression: '',

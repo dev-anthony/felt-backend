@@ -17,17 +17,7 @@
 
 const { getSuffix } = require('../technique')
 const { getConcept } = require('../vocabulary')
-
-const QUALITY_TAIL_PHOTO =
-  'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
-  'Intentional, moody and authentic — real camera capture, real skin pores and textile weave, ' +
-  'zero digital smoothing, zero plastic AI skin, zero CGI compositing artifacts, no floating neon, ' +
-  'no text or logos rendered in the image.'
-
-const QUALITY_TAIL_ILLUSTRATION =
-  'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
-  'Handmade print aesthetic with visible tactile ink/paper imperfection, ' +
-  'zero glossy digital gradients, zero plastic AI smoothing, no text or logos rendered in the image.'
+const { photographicRealityTail, illustrationRealityTail } = require('../reality')
 
 // Non-photographic mediums whose presence must suppress the camera/film chain,
 // otherwise the prompt says both "screen-print" and "shot on a film camera".
@@ -87,10 +77,14 @@ function assemblePrompt({ blueprint, dna }) {
   const blocks = [
     // 1. Medium / editorial / graphic framing
     sentence([frag(dna, 'artMedium'), frag(dna, 'editorial'), frag(dna, 'graphic')]),
-    // 2. Subject
+    // 2. Subject — STORY-owned (from the blueprint), never the DNA archetype,
+    //    so we never describe two different subjects in one prompt.
     sentence([b.subject, b.wardrobe, b.pose, b.expression]),
-    // 3. Action + environment
-    sentence([b.sceneAction, frag(dna, 'environment')]),
+    // 3. Action + setting — STORY-owned. The scene already names the location,
+    //    so the DNA `environment` selection is intentionally NOT emitted here
+    //    (it would add a second, conflicting setting). The DNA environment still
+    //    informs the Gemini compiler as a soft styling constraint.
+    sentence([b.sceneAction]),
     // 4. Capture chain (photographic only)
     captureChain,
     // 5. Lighting
@@ -109,8 +103,12 @@ function assemblePrompt({ blueprint, dna }) {
     b.narrative ? sentence([`the moment reads as ${b.narrative}`]) : '',
     // 12. Technique suffix — verbatim from the legacy system, photographic only
     photographic ? getSuffix(technique) : '',
-    // 13. Quality guardrails
-    photographic ? QUALITY_TAIL_PHOTO : QUALITY_TAIL_ILLUSTRATION,
+    // 13. Photographic Reality Engine tail (believability + AI-tell negatives).
+    //     Doubles as the quality tail. Single-subject unless the caller opts into
+    //     a group (default guards against the common unwanted-second-person leak).
+    photographic
+      ? photographicRealityTail({ singleSubject: !allowGroup })
+      : illustrationRealityTail(),
   ]
 
   const prompt = blocks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
