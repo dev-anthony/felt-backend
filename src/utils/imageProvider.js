@@ -21,7 +21,7 @@ const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'pollinations').toLowerC
 // chars); Pollinations tolerates long query strings, so keep a generous cap
 // that preserves the Reality Engine tail at the end while still guarding against
 // pathological lengths. Override with POLLINATIONS_PROMPT_MAX if needed.
-function trimForUrl(prompt, max = Number(process.env.POLLINATIONS_PROMPT_MAX) || 2600) {
+function trimForUrl(prompt, max = Number(process.env.POLLINATIONS_PROMPT_MAX) || 2900) {
   if (prompt.length <= max) return prompt
   return prompt.slice(0, max).replace(/[,\s]+\S*$/, '') // cut on a clean word boundary
 }

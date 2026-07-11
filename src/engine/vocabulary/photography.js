@@ -48,6 +48,11 @@ const LENSES = [
     fragment: '50mm lens wide open at f/1.4 with organic vintage edge falloff',
     anchor: { motion: 0.65, intimacy: 0.5, danceability: 0.6 },
     techniques: ['MOTION_BLUR_STROBE', 'MACRO_INTIMATE_DETAIL'] },
+  { id: 'lens_85mm_portrait', category: 'lens', tags: ['portrait', 'telephoto', 'bokeh', 'flattering'],
+    fragment: '85mm portrait lens at f/1.4, shallow depth of field, creamy background bokeh and flattering facial compression',
+    anchor: { intimacy: 0.55, warmth: 0.5, valence: 0.5, brightness: 0.5 },
+    techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MACRO_INTIMATE_DETAIL', 'DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE'],
+    source: 'research: /PROMT reference — 85mm, soft bokeh, shallow DOF editorial portrait' },
   { id: 'lens_110mm_f35', category: 'lens', tags: ['short-tele', 'soft', 'medium-format'],
     fragment: '110mm lens at f/3.5 with soft rolling-focus bokeh',
     anchor: { acousticness: 0.65, intimacy: 0.6, energy: 0.3 } },
@@ -93,39 +98,54 @@ const FILM_STOCKS = [
     techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MACRO_INTIMATE_DETAIL'] },
 ]
 
-/** @type {import('../types').VocabularyConcept[]} */
+/**
+ * Lighting concepts are written as real photographic SETUPS — key direction,
+ * fill, rim/edge, practicals, gel, haze and where the catchlight lands — because
+ * naming an actual lighting diagram (not "warm light") is what separates a
+ * studio photograph from a generic AI render. Each keeps ONE coherent key so the
+ * shadows never contradict.
+ * @type {import('../types').VocabularyConcept[]}
+ */
 const LIGHTING = [
   { id: 'light_direct_flash', category: 'lighting', tags: ['flash', 'hard', 'overexposed'],
-    fragment: 'harsh direct on-camera flash, slightly overexposed skin and a hard graphic shadow cast on the wall behind',
+    fragment: 'harsh direct on-camera flash, slightly overexposed skin highlights, a hard graphic shadow cast on the wall behind, a sharp specular catchlight in the eyes',
     anchor: { grit: 0.7, aggression: 0.6, energy: 0.7, euphoria: 0.5 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
-  { id: 'light_chiaroscuro', category: 'lighting', tags: ['low-key', 'dramatic', 'contrast'],
-    fragment: 'low-key chiaroscuro lighting with a single hard source and deep shadow falloff',
+  { id: 'light_chiaroscuro', category: 'lighting', tags: ['low-key', 'dramatic', 'contrast', 'rim'],
+    fragment: 'dramatic low-key chiaroscuro: a single hard key from one side, deep shadow falloff across the face, a crisp rim light peeling the subject off a near-black background, and a bright catchlight in the eyes',
     anchor: { darkness: 0.75, valence: 0.25, intimacy: 0.55 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH'] },
   { id: 'light_high_key_wrap', category: 'lighting', tags: ['high-key', 'soft', 'bright'],
-    fragment: 'high-key wrap-around studio lighting with bright soft reflections',
+    fragment: 'a large soft key from camera-left with gentle fill for an airy high-key wrap, clean bright reflections and soft catchlights in the eyes',
     anchor: { euphoria: 0.7, brightness: 0.75, valence: 0.7 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'light_golden_hour', category: 'lighting', tags: ['warm', 'natural', 'directional'],
-    fragment: 'warm low golden-hour sunlight raking across the subject',
+    fragment: 'warm low golden-hour sun raking across the subject from the side, long soft shadows and a warm catchlight in the eyes',
     anchor: { warmth: 0.75, valence: 0.65, brightness: 0.6 },
     techniques: ['VINTAGE_FILM_NOSTALGIA', 'MONUMENTAL_SCALE_ISOLATION'] },
   { id: 'light_north_window', category: 'lighting', tags: ['soft', 'diffuse', 'natural'],
-    fragment: 'soft diffused north-window daylight with gentle wrap-around shadows',
+    fragment: 'soft diffused north-window daylight from camera-left, gentle wrap-around shadows and a soft catchlight in the eyes',
     anchor: { intimacy: 0.6, acousticness: 0.6, energy: 0.35 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'VINTAGE_FILM_NOSTALGIA'] },
   { id: 'light_rim_backlight', category: 'lighting', tags: ['rim', 'backlight', 'silhouette'],
-    fragment: 'strong rim backlight separating a mostly-shadowed subject from a hazy background',
+    fragment: 'a strong rim/edge backlight tracing the subject against a hazy background, minimal ambient fill, deep crushed shadow on the face',
     anchor: { darkness: 0.6, intimacy: 0.4, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'MONUMENTAL_SCALE_ISOLATION'] },
-  { id: 'light_spotlight_halo', category: 'lighting', tags: ['spotlight', 'projection', 'halo', 'circular'],
-    fragment: 'a single circular spotlight projected on the wall behind the subject forming a glowing halo disc',
-    anchor: { darkness: 0.5, valence: 0.45, intimacy: 0.5, brightness: 0.4 },
-    techniques: ['SILHOUETTE_ATMOSPHERE', 'STUDIO_SEAMLESS_EDITORIAL'],
-    source: 'research: Tems-style orange sun-orb halo reference image' },
+  { id: 'light_spotlight_halo', category: 'lighting', tags: ['spotlight', 'projection', 'halo', 'circular', 'gel'],
+    // Learned as a CONCEPT (a projected spotlight halo behind the head), not a
+    // copy of the reference's orange — the hue is left to the color DNA layer so
+    // a cold song gets a cold halo and a warm song a warm one.
+    fragment: 'a gelled key colored to the scene palette, a circular spotlight projected on the wall behind the head forming a glowing halo disc in that same colour, dramatic chiaroscuro on the face, a soft rim light and a bright catchlight in the eyes',
+    anchor: { darkness: 0.5, valence: 0.4, intimacy: 0.5, brightness: 0.4 },
+    techniques: ['SILHOUETTE_ATMOSPHERE', 'STUDIO_SEAMLESS_EDITORIAL', 'DUOTONE_COLOR_WASH'],
+    source: 'research: /PROMT + Tems sun-orb halo reference — concept (projected halo + gel + rim + catchlight), hue left to the palette' },
+  { id: 'light_practical_haze', category: 'lighting', tags: ['practical', 'club', 'haze', 'volumetric', 'night'],
+    fragment: 'glowing practical bulbs behind the subject, one soft key from camera-left, atmospheric haze catching volumetric light beams, an edge light outlining the figure',
+    anchor: { darkness: 0.55, motion: 0.5, intimacy: 0.45 },
+    techniques: ['DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE', 'FLASH_DOCUMENTARY'],
+    source: 'research: nightlife practical + volumetric haze lighting diagram' },
   { id: 'light_single_gel', category: 'lighting', tags: ['gel', 'colored', 'moody'],
-    fragment: 'the whole frame lit through a single colored gel, one dominant hue washing the scene',
+    fragment: 'the frame lit through a single colored gel for one dominant hue, a contrasting rim of color separating the subject from the background',
     anchor: { darkness: 0.55, intimacy: 0.45, motion: 0.4 },
     techniques: ['DUOTONE_COLOR_WASH'] },
 ]

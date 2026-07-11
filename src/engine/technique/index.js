@@ -62,7 +62,11 @@ const TECHNIQUES = {
   },
 }
 
-const DEFAULT_TECHNIQUE = 'SILHOUETTE_ATMOSPHERE'
+// Fallback technique when the model doesn't return a valid one. Deliberately
+// NOT a silhouette technique — silhouettes hide the subject's identity and are
+// the main cause of generic-looking fallbacks. DUOTONE reveals a lit face while
+// staying moody and working with almost any scene/palette.
+const DEFAULT_TECHNIQUE = 'DUOTONE_COLOR_WASH'
 
 // Backward-compatible flat map: exactly the old TECHNIQUE_SUFFIXES shape so the
 // existing parse/build helpers in generation.js can import it unchanged.

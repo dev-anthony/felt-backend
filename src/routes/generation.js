@@ -89,10 +89,15 @@ TECHNIQUE LIBRARY — choose exactly ONE per brief, matched to the emotional ene
    - Subject against a saturated solid-color seamless paper backdrop, lit with direct flash or hard strip light.
    - Editorial energy, but grain and skin texture stay real and gritty — never glossy catalog-smooth.
 
-10. MONUMENTAL_SCALE_ISOLATION (for loneliness, quiet resolve, "keep moving," freedom, small-against-the-world feelings — THIS IS THE DEFAULT LEAN for reflective/chill/moody briefs)
+10. MONUMENTAL_SCALE_ISOLATION (for loneliness, absence, memory, freedom, small-against-the-world feelings)
    - One massive, dominant single element (an oversized sun or moon, a towering wall, a vast flat horizon, an enormous cloud bank) swallows most of the frame.
    - The human subject, if present at all, is small, often fully silhouetted, and pushed to one edge or the bottom of the frame — the scale imbalance IS the emotional content.
    - Backgrounds can be a single flat color field (a wall, a sky) with no other detail competing for attention. This technique can also render with NO human figure at all — an empty landscape, a parked car, a single object — if the brief is about absence, memory, or isolation rather than a person's presence.
+
+TECHNIQUE SELECTION (CRITICAL — do NOT default to silhouettes):
+- Choose the technique that genuinely fits the emotion, and VARY it across songs. Do not reach for SILHOUETTE_ATMOSPHERE by habit.
+- SILHOUETTE_ATMOSPHERE and MONUMENTAL_SCALE_ISOLATION HIDE the subject's face and identity — a silhouette has no personality. Use them ONLY when the song is truly about isolation, anonymity, grandeur, absence or memory. They are the exception, not the default.
+- Most covers should REVEAL the subject's face and identity. For moody, intimate, romantic, confident, nostalgic or energetic songs prefer an identity-showing technique: DUOTONE_COLOR_WASH, MACRO_INTIMATE_DETAIL, VINTAGE_FILM_NOSTALGIA, STUDIO_SEAMLESS_EDITORIAL, FLASH_DOCUMENTARY, MOTION_BLUR_STROBE, MIRROR_DOUBLE_EXPOSURE or SURREAL_PRACTICAL_METAPHOR — a dark, moody mood does NOT require a silhouette.
 
 RELEVANCE MANDATE (CRITICAL — this is the entire job):
 - The scene MUST be visibly, specifically about what THIS song is about. Read the artist's feeling and the distilled theme, then stage the actual situation, place, person, or emotional moment they describe.

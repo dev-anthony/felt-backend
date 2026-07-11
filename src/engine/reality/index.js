@@ -22,12 +22,12 @@
 const REALITY_POSITIVES = [
   'correct human anatomy and proportions',
   'natural five-fingered hands',
-  'real skin with visible pores and subtle blemishes, never waxy or airbrushed',
+  'high-detail skin with visible pores, subtle blemishes and a natural glow/sheen where light falls, never waxy or airbrushed',
   'natural facial asymmetry',
   'authentic fabric folds and weave',
-  'catchlights in the eyes',
+  'bright catchlights in the eyes',
   'shadows all falling in one consistent direction',
-  'realistic lens depth of field',
+  'realistic lens depth of field with soft background bokeh',
 ]
 
 // Negative constraints — the recognizable fingerprints of AI generation.
