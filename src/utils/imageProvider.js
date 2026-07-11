@@ -17,9 +17,11 @@
 const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'pollinations').toLowerCase()
 
 // Some providers pass the prompt in the URL (Pollinations) and can 414 on very
-// long prompts. The Visual DNA prompt is intentionally rich (~1.8k chars), so
-// trim for URL-based providers without gutting the guidance.
-function trimForUrl(prompt, max = 1400) {
+// long prompts. The Visual DNA + Reality prompt is intentionally rich (~2k
+// chars); Pollinations tolerates long query strings, so keep a generous cap
+// that preserves the Reality Engine tail at the end while still guarding against
+// pathological lengths. Override with POLLINATIONS_PROMPT_MAX if needed.
+function trimForUrl(prompt, max = Number(process.env.POLLINATIONS_PROMPT_MAX) || 2600) {
   if (prompt.length <= max) return prompt
   return prompt.slice(0, max).replace(/[,\s]+\S*$/, '') // cut on a clean word boundary
 }

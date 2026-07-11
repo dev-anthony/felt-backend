@@ -17,31 +17,27 @@
  * the music-driven layers.
  */
 
-// Positive constraints — what a real photograph physically contains.
+// Positive constraints — what a real photograph physically contains. Kept tight
+// so the tail survives inside the image provider's prompt-length budget.
 const REALITY_POSITIVES = [
-  'anatomically correct human proportions',
-  'natural hands with exactly five fingers and correct joint structure',
-  'natural facial asymmetry and lifelike bone structure',
-  'real skin with visible pores, fine texture, subtle blemishes and natural oil sheen (never airbrushed or waxy)',
-  'authentic fabric behaviour with real folds, seams, weave and weight',
-  'catchlights and moist reflections in the eyes',
-  'individually varied hair strands with natural flyaways',
-  'physically consistent lighting with shadows all falling in one coherent direction',
-  'realistic lens compression, depth of field and focus falloff',
-  'true-to-life material response and optical micro-imperfections',
+  'correct human anatomy and proportions',
+  'natural five-fingered hands',
+  'real skin with visible pores and subtle blemishes, never waxy or airbrushed',
+  'natural facial asymmetry',
+  'authentic fabric folds and weave',
+  'catchlights in the eyes',
+  'shadows all falling in one consistent direction',
+  'realistic lens depth of field',
 ]
 
 // Negative constraints — the recognizable fingerprints of AI generation.
 const REALITY_NEGATIVES = [
   'plastic or waxy skin',
-  'airbrushed poreless faces',
-  'malformed or extra or fused fingers',
-  'warped or asymmetrical-in-the-wrong-way faces',
-  'duplicated or missing limbs',
-  'dead glassy eyes',
-  'floating neon or particle haze',
-  'over-smoothed CGI render look',
-  'unnatural bilateral symmetry',
+  'malformed or extra fingers',
+  'warped faces',
+  'duplicated limbs',
+  'glassy dead eyes',
+  'over-smoothed CGI look',
 ]
 
 /**

@@ -48,10 +48,11 @@ RULES:
 - Describe ONE subject only. Never two people touching, embracing, kissing, or in romantic/sexual contact — translate any such energy through a single figure's expression, posture, distance, or the symbolic motif instead.
 - Do NOT mention cameras, lenses, film, lighting, grain, color grading, composition, or motion — those are locked and handled by the art department.
 - Keep the subject and environment consistent with the locked styling above.
-- Every value is one short phrase (max ~14 words). Concrete and physical, not abstract or poetic.
+- CONSTRUCT A REAL PERSON, not a vague type. Give concrete physical facts: approximate age, build, skin tone/undertone, hair texture and exact styling, specific garments with fabric and color, a defining accessory, and a real expression. BANNED vague words: "beautiful", "stunning", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone". Replace each with tangible detail.
+- Concrete and physical, not abstract or poetic. No metaphors in the phrasing.
 
 Return exactly this JSON shape:
-{"subject":"who is in frame (build on the locked styling)","wardrobe":"specific clothing/accessory detail","pose":"body position and framing distance","expression":"facial expression / gaze","sceneAction":"what the subject is physically doing","narrative":"the one-line emotional story of the moment","symbolism":"one physical symbolic object present, or 'none'"}`
+{"subject":"a tangible constructed person: age, build, skin tone, hair texture and styling","wardrobe":"specific garments with fabric+color and one defining accessory","pose":"body position, gesture, framing distance, and eye contact (e.g. chest-up, looking just off-lens)","expression":"a real facial expression","sceneAction":"what the subject is physically doing in the named setting","narrative":"the one-line emotional story of the moment","symbolism":"one physical symbolic object present, or 'none'"}`
 }
 
 /** Strips code fences / stray prose and parses the first JSON object found. */

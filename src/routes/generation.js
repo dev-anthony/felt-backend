@@ -104,16 +104,23 @@ STORY-ONLY RULE (CRITICAL):
 - Do NOT mention any camera, lens, film stock, lighting, shadows, rim light, color grade, hue, grain, exposure, vignette, or post-processing. A separate system already decides every one of those, and naming them here corrupts the result. Simply describe the world and the moment, the way you'd tell a friend what is happening in the photo.
 - Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy."
 
+SUBJECT CONSTRUCTION (CRITICAL — this is what makes a person look REAL, not AI):
+- When a person is in frame, build a SPECIFIC, TANGIBLE human, never a vague type. A believable cover names concrete physical facts, e.g. "a 24-year-old woman with deep brown skin and a few freckles, natural locs pulled into a loose high bun with flyaway strands, oversized square black acetate glasses, an oversized striped knit sweater in rust and cream."
+- Always specify, in plain words: approximate age, build, skin tone/undertone, hair texture and exact styling, one or two specific garments with their fabric and color, any defining accessory, and a real facial expression.
+- Give them a specific POSE and a specific GESTURE (a hand at the jaw, glancing back over a shoulder, mid-stride), and state the framing distance and whether they meet the camera's eye (e.g. "chest-up, looking just off-lens").
+- BANNED vague words — never use these to describe a person: "beautiful", "stunning", "gorgeous", "sculptural", "high-fashion figure", "enigmatic figure", "mysterious silhouette", "a person", "someone". Replace every one with concrete physical detail.
+- Faceless silhouettes are allowed ONLY when the chosen technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION; otherwise the face and features must be described and visible.
+
 SUBJECT COUNT RULE (CRITICAL):
 - Default to exactly ONE subject in frame. Do not add a second person unless the input is explicitly about a duo, group, or named collaboration.
-- NEVER depict two people embracing, kissing, dancing pressed together, or in any romantic/sexual physical contact — regardless of how romantic or sexual the lyrics or vibe are. This is true even when the song is explicitly about sex, romance, or a relationship.
-- When lyrics or input are romantic or sexual, translate that energy through ONE of: a single subject's expression/posture, symbolic objects, environmental heat/atmosphere, or distance/isolation — never through two bodies touching. A song about desire becomes a single figure with an unreadable expression, not two people kissing.
+- NEVER depict two people embracing, kissing, dancing together or pressed together, or in any romantic/sexual physical contact — regardless of how romantic or sexual the lyrics or vibe are. This is true even when the song is explicitly about sex, romance, or a relationship.
+- When lyrics or input are romantic or sexual, translate that energy through ONE of: a single subject's expression/posture, symbolic objects, environmental heat/atmosphere, or distance/isolation — never through two bodies touching. A song about desire becomes a single figure with an unreadable expression, not two people together.
 - Two-person compositions are the single most common way this system produces a generic, risky, or stock-photo result. Treat "add a second person" as something that requires explicit justification from the input.
 
 OUTPUT FORMAT (CRITICAL):
 Respond with exactly two lines, nothing else:
 TECHNIQUE: <one of the 10 technique names above, exact match>
-SCENE: <2-3 sentence concrete story grounded in this song's theme — a specific subject, a specific setting, a specific action, an expression, and at most one symbolic object. No camera, lighting, color, or grain words. No preamble, no quotes, no lyric excerpts.>`;
+SCENE: <2-3 sentence concrete story grounded in this song's theme. Fully construct the subject with tangible physical detail (age, skin, hair, specific garments/fabric, accessory, expression, pose, gesture, framing distance, eye contact), name a specific setting, and include at most one symbolic object. No camera, lighting, color, or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
 
 // TECHNIQUE_SUFFIXES and DEFAULT_TECHNIQUE are now imported from ../engine/technique
 // (see requires above) — same 10 techniques, same suffix strings, just modular.

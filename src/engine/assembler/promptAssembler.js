@@ -48,9 +48,11 @@ function sentence(parts) {
  * @param {object} args
  * @param {import('../types').SceneBlueprint} args.blueprint
  * @param {import('../types').VisualDNA} args.dna
+ * @param {boolean} [args.allowGroup] permit more than one person in frame
+ *   (default false — guards against the common unwanted second-person result)
  * @returns {import('../types').AssembledPrompt}
  */
-function assemblePrompt({ blueprint, dna }) {
+function assemblePrompt({ blueprint, dna, allowGroup = false }) {
   const b = blueprint || {}
   const technique = dna.technique
 
@@ -116,4 +118,4 @@ function assemblePrompt({ blueprint, dna }) {
   return { prompt, technique, dna, scene: b }
 }
 
-module.exports = { assemblePrompt, QUALITY_TAIL_PHOTO, QUALITY_TAIL_ILLUSTRATION }
+module.exports = { assemblePrompt }
