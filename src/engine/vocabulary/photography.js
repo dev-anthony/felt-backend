@@ -108,11 +108,11 @@ const FILM_STOCKS = [
  */
 const LIGHTING = [
   { id: 'light_direct_flash', category: 'lighting', tags: ['flash', 'hard', 'overexposed'],
-    fragment: 'harsh direct on-camera flash, slightly overexposed skin highlights, a hard graphic shadow cast on the wall behind, a sharp specular catchlight in the eyes',
+    fragment: 'direct on-camera flash, slightly overexposed skin highlights, a hard-edged shadow cast on the wall behind, a small specular catchlight in the eyes',
     anchor: { grit: 0.7, aggression: 0.6, energy: 0.7, euphoria: 0.5 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'light_chiaroscuro', category: 'lighting', tags: ['low-key', 'dramatic', 'contrast', 'rim'],
-    fragment: 'dramatic low-key chiaroscuro: a single soft key from one side that still clearly lights and reveals the face and eyes, shadow falling off toward the far cheek, a crisp rim light peeling the subject off a near-black background, and a bright catchlight in the eyes',
+    fragment: 'low-key chiaroscuro: a single soft key at 45 degrees that clearly lights and reveals the face and eyes, shadow falling off toward the far cheek, a thin rim light separating the subject from a near-black background, a catchlight in the eyes',
     anchor: { darkness: 0.75, valence: 0.25, intimacy: 0.55 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH'] },
   { id: 'light_high_key_wrap', category: 'lighting', tags: ['high-key', 'soft', 'bright'],

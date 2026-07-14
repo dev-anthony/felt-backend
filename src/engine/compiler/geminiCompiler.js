@@ -47,15 +47,16 @@ RULES:
 - Return ONLY minified JSON, no prose, no markdown fences.
 - Describe ONE subject only. Never two people touching, embracing, kissing, or in romantic/sexual contact — translate any such energy through a single figure's expression, posture, distance, or the symbolic motif instead.
 - Do NOT mention cameras, lenses, film, lighting, grain, color grading, composition, or motion — those are locked and handled by the art department.
-- CHOOSE WHO fits this song — do NOT default to a young woman. Pick the gender, an age that fits (teen, 20s, 30s-40s, elder), body type and cultural context from the song. Then make them MEMORABLE with one distinctive marker (a fade/shaved lines, box braids, locs, a durag, gap/gold tooth, nose ring, face/hand tattoo, scar, freckles, cultural jewelry, a signature hat) — someone specific, not a stock model.
-- Dress them in SPECIFIC interesting clothing with real fabric/cut (aso-oke, velvet, wax-print, metallic bomber, mesh, leather, handwoven knit) — never "a black top".
+- CHOOSE WHO fits this song — do NOT default to a young woman. Pick gender, an age that fits (child, teen, 20s-40s, elder), body/build and cultural context from the song. Men, women, children, elders, unconventional-looking people all belong. Make them MEMORABLE with one distinctive marker (fade/shaved lines, box braids, locs, durag, grey hair, gap/gold tooth, nose ring, face/hand tattoo, scar, freckles, cultural jewelry, a signature hat) — someone specific, not a stock model.
+- SKIN must be specific and match the character: name a base tone from a real spectrum (porcelain → warm ivory → golden olive → honey-bronze → rich caramel → deep espresso → obsidian), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, weathered lines, a scar). Do not always pick the same tone.
+- WARDROBE has WEIGHT: name the garment AND how the fabric sits on the body (cut, stiffness, drape) — "a heavy structured wool coat cinched at the waist", not "a red dress"; "an oversized drop-shoulder heavy hoodie stacking at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh.
 - Set a SPECIFIC named location with atmosphere and one or two meaningful props — never "a dimly lit room".
 - Show ACTION, not a static pose. If the song is about movement/dancing, the body reads as in motion. Avoid "chin up, eyes closed, hand on chest".
-- Concrete and physical, not abstract or poetic. BANNED vague words: "beautiful", "stunning", "attractive", "sculptural", "high-fashion figure", "enigmatic", "a person", "someone".
-- BREVITY (important): every value is a SHORT phrase of about 8-14 words. No full sentences, no multiple clauses, no explaining. Pack in concrete nouns, not description.
+- Concrete/structural, not abstract or editorial. BANNED words: "beautiful", "stunning", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "a person", "someone", "cool outfit", "stylish".
+- BREVITY: each value is a SHORT phrase (~10-16 words), packed with concrete nouns, no full sentences.
 
-Return exactly this JSON shape (each value a short phrase, ~8-14 words):
-{"subject":"gender, age, skin tone, hair + one memorable marker","wardrobe":"specific garment (fabric+color) + one accessory","environment":"a specific named place + atmosphere + one prop","pose":"a moment of action/gesture + framing distance","expression":"a real facial expression","sceneAction":"what is physically HAPPENING in the moment","narrative":"one short emotional beat","symbolism":"one physical symbolic object, or 'none'"}`
+Return exactly this JSON shape:
+{"subject":"gender, age, build + skin base-tone/undertone/micro-texture + hair + one memorable marker","wardrobe":"specific garment (fabric+color) AND how it drapes/holds shape on the body","environment":"a specific named place + atmosphere + one prop","pose":"a moment of action/gesture + framing distance","expression":"a real facial expression","sceneAction":"what is physically HAPPENING in the moment","narrative":"one short emotional beat","symbolism":"one physical symbolic object, or 'none'"}`
 }
 
 /** Strips code fences / stray prose and parses the first JSON object found. */

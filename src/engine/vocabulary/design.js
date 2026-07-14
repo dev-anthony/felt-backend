@@ -66,7 +66,7 @@ const COLOR_SYSTEMS = [
     anchor: { euphoria: 0.6, brightness: 0.75, intimacy: 0.5, valence: 0.65 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'color_bold_seamless', category: 'color', tags: ['bold', 'saturated', 'single-color'],
-    fragment: 'one bold saturated seamless color field filling the entire background',
+    fragment: 'one saturated seamless color field filling the background behind the subject',
     anchor: { euphoria: 0.65, energy: 0.6, valence: 0.6 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
 ]

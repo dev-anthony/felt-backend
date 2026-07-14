@@ -20,24 +20,17 @@
 // Positive constraints — what a real photograph physically contains. Kept tight
 // so the tail survives inside the image provider's prompt-length budget.
 const REALITY_POSITIVES = [
-  'correct human anatomy and proportions',
-  'natural five-fingered hands',
-  'high-detail skin with visible pores, subtle blemishes and a natural glow/sheen where light falls, never waxy or airbrushed',
-  'natural facial asymmetry',
-  'authentic fabric folds and weave',
-  'bright catchlights in the eyes',
-  'shadows all falling in one consistent direction',
-  'realistic lens depth of field with soft background bokeh',
+  'correct anatomy with real weight and natural five-fingered hands',
+  'skin with subsurface scattering, visible pores, fine lines and natural oils, never waxy or airbrushed',
+  'a specific asymmetric face with individual bone structure, not a doll',
+  'clothing with real fabric weight and drape that holds its own shape, contact shadows where cloth meets skin',
+  'catchlights in the eyes and shadows in one consistent direction',
 ]
 
 // Negative constraints — the recognizable fingerprints of AI generation.
 const REALITY_NEGATIVES = [
-  'plastic or waxy skin',
-  'malformed or extra fingers',
-  'warped faces',
-  'duplicated limbs',
-  'glassy dead eyes',
-  'over-smoothed CGI look',
+  'plastic or waxy skin', 'poreless airbrushed faces', 'malformed or extra fingers',
+  'warped doll-like faces', 'duplicated limbs', 'floating or shapeless garments', 'over-smoothed CGI look',
 ]
 
 /**
@@ -55,18 +48,16 @@ function photographicRealityTail({ singleSubject = false, faceVisible = true } =
   // clearly lit and readable, and it must be the brightest focal anchor.
   // Suppressed only for genuine silhouette techniques (faceVisible=false).
   const face = faceVisible
-    ? 'The subject is the clear focal anchor filling 30-45% of the frame, their face clearly lit from the front and fully visible with readable eyes, expression and skin detail; background lights, bokeh and haze stay dimmer than the face and never silhouette, black out or obscure it. '
+    ? 'The subject is the clear focal point filling 30-45% of the frame, face lit from the front and fully readable, never darker than the background. '
     : ''
-  const faceNeg = faceVisible
-    ? ', a blacked-out or fully silhouetted face, a face lost to shadow, a background brighter than the subject'
-    : ''
+  const faceNeg = faceVisible ? ', a blacked-out or silhouetted face, a background brighter than the subject' : ''
   return (
-    'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+    'A 1:1 square streaming cover, edge to edge, no border. ' +
     solo + face +
-    'Shot on a real camera and hand-graded — ' +
+    'Shot on a real camera — ' +
     REALITY_POSITIVES.join(', ') + '. ' +
     'Absolutely no ' + REALITY_NEGATIVES.join(', ') + faceNeg + '. ' +
-    'No text, letters, watermarks or logos rendered anywhere in the image.'
+    'No text or logos anywhere.'
   )
 }
 
