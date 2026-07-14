@@ -5,7 +5,7 @@ decision is explainable from the audio features; the same song always computes
 the same visual execution, yet similar songs diverge, so one genre yields many
 different looks.
 
-```
+``` 
 Essentia features
   → Feature Normalization      (dna/featureVector.js)
   → Technique (soft bias)      (technique/index.js)

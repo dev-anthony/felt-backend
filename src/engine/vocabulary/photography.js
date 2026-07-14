@@ -112,7 +112,7 @@ const LIGHTING = [
     anchor: { grit: 0.7, aggression: 0.6, energy: 0.7, euphoria: 0.5 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'light_chiaroscuro', category: 'lighting', tags: ['low-key', 'dramatic', 'contrast', 'rim'],
-    fragment: 'dramatic low-key chiaroscuro: a single hard key from one side, deep shadow falloff across the face, a crisp rim light peeling the subject off a near-black background, and a bright catchlight in the eyes',
+    fragment: 'dramatic low-key chiaroscuro: a single soft key from one side that still clearly lights and reveals the face and eyes, shadow falling off toward the far cheek, a crisp rim light peeling the subject off a near-black background, and a bright catchlight in the eyes',
     anchor: { darkness: 0.75, valence: 0.25, intimacy: 0.55 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH'] },
   { id: 'light_high_key_wrap', category: 'lighting', tags: ['high-key', 'soft', 'bright'],
@@ -128,19 +128,19 @@ const LIGHTING = [
     anchor: { intimacy: 0.6, acousticness: 0.6, energy: 0.35 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'VINTAGE_FILM_NOSTALGIA'] },
   { id: 'light_rim_backlight', category: 'lighting', tags: ['rim', 'backlight', 'silhouette'],
-    fragment: 'a strong rim/edge backlight tracing the subject against a hazy background, minimal ambient fill, deep crushed shadow on the face',
+    fragment: 'a strong rim/edge backlight tracing the subject against a hazy background, plus a soft frontal fill that keeps the face clearly lit and readable',
     anchor: { darkness: 0.6, intimacy: 0.4, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'MONUMENTAL_SCALE_ISOLATION'] },
   { id: 'light_spotlight_halo', category: 'lighting', tags: ['spotlight', 'projection', 'halo', 'circular', 'gel'],
-    // Learned as a CONCEPT (a projected spotlight halo behind the head), not a
-    // copy of the reference's orange — the hue is left to the color DNA layer so
-    // a cold song gets a cold halo and a warm song a warm one.
-    fragment: 'a gelled key colored to the scene palette, a circular spotlight projected on the wall behind the head forming a glowing halo disc in that same colour, dramatic chiaroscuro on the face, a soft rim light and a bright catchlight in the eyes',
+    // Learned as a CONCEPT (projected halo behind the head), not a copy of the
+    // reference's orange — the hue comes from the color DNA layer, and the front
+    // key keeps the face lit rather than silhouetting it.
+    fragment: 'a gelled key colored to the scene palette lighting the face clearly from the front, a circular spotlight projected on the wall behind the head forming a glowing halo disc in that same colour, a soft rim light and a bright catchlight in the eyes',
     anchor: { darkness: 0.5, valence: 0.4, intimacy: 0.5, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'STUDIO_SEAMLESS_EDITORIAL', 'DUOTONE_COLOR_WASH'],
-    source: 'research: /PROMT + Tems sun-orb halo reference — concept (projected halo + gel + rim + catchlight), hue left to the palette' },
+    source: 'research: /PROMT + Tems sun-orb halo — concept (projected halo + gel + rim + catchlight), hue left to palette, face kept lit' },
   { id: 'light_practical_haze', category: 'lighting', tags: ['practical', 'club', 'haze', 'volumetric', 'night'],
-    fragment: 'glowing practical bulbs behind the subject, one soft key from camera-left, atmospheric haze catching volumetric light beams, an edge light outlining the figure',
+    fragment: 'glowing practical bulbs behind the subject, one soft key from camera-left clearly lighting the face, atmospheric haze catching volumetric light beams, an edge light tracing the figure',
     anchor: { darkness: 0.55, motion: 0.5, intimacy: 0.45 },
     techniques: ['DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE', 'FLASH_DOCUMENTARY'],
     source: 'research: nightlife practical + volumetric haze lighting diagram' },

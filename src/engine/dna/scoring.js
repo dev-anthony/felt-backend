@@ -58,13 +58,19 @@ function anchorScore(vector, anchor, weights) {
  * @param {string} [opts.technique]      active technique name for soft bias
  * @param {number} [opts.techniqueBonus] additive score when a candidate lists
  *                                        the active technique (default 0.12)
+ * @param {string[]} [opts.preferredIds] concept ids the active technique's art
+ *                                        direction prefers for THIS layer — a
+ *                                        strong (still soft) coherence pull
+ * @param {number} [opts.preferredBonus] additive score for a preferred id
+ *                                        (default 0.30)
  * @param {number} [opts.explore]        prob. of picking a near-tie runner-up
  *                                        via seeded PRNG (default 0.35)
  * @param {string} [opts.fallbackId]     id to use if candidates is empty
  */
 function selectConcept(candidates, vector, opts = {}) {
-  const { technique, techniqueBonus = 0.12, explore = 0.35 } = opts
+  const { technique, techniqueBonus = 0.12, preferredIds, preferredBonus = 0.30, explore = 0.35 } = opts
   const list = Array.isArray(candidates) ? candidates.filter(Boolean) : []
+  const preferred = preferredIds && preferredIds.length ? new Set(preferredIds) : null
 
   if (list.length === 0) {
     return {
@@ -77,6 +83,13 @@ function selectConcept(candidates, vector, opts = {}) {
     let score = anchorScore(vector, c.anchor, c.weights)
     if (technique && Array.isArray(c.techniques) && c.techniques.includes(technique)) {
       score += techniqueBonus
+    }
+    // Art-direction coherence: the active technique names the concepts it wants
+    // per layer. Those get a strong bonus, so every layer speaks one visual
+    // language — but the anchor still chooses AMONG the preferred set, so
+    // different songs under the same technique still diverge.
+    if (preferred && preferred.has(c.id)) {
+      score += preferredBonus
     }
     return { concept: c, score }
   })

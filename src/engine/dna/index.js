@@ -17,7 +17,7 @@
 const { buildFeatureVector } = require('./featureVector')
 const { selectConcept } = require('./scoring')
 const { getCategory } = require('../vocabulary')
-const { applyTechniqueBias, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
+const { applyTechniqueBias, getAffinity, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
 
 /**
  * Layer registry. `priority` orders fragments in the assembled prompt and
@@ -80,6 +80,9 @@ function computeVisualDNA(rawFeatures, techniqueName) {
       technique,
       explore: layer.explore,
       techniqueBonus: layer.bonus,
+      // Art-direction coherence: the technique names its preferred concepts for
+      // this layer, so camera/lens/lighting/etc. speak one visual language.
+      preferredIds: getAffinity(technique, layer.key),
     })
     const chosen = selection || fallbackSelection(layer)
     chosen.layer = layer.key

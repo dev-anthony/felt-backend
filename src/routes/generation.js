@@ -107,7 +107,7 @@ RELEVANCE MANDATE (CRITICAL — this is the entire job):
 STORY-ONLY RULE (CRITICAL):
 - You write the STORY, never the photography. Describe ONLY: who or what is in frame, where they are, what they are physically doing, their expression/posture, and at most ONE physical symbolic object.
 - Do NOT mention any camera, lens, film stock, lighting, shadows, rim light, color grade, hue, grain, exposure, vignette, or post-processing. A separate system already decides every one of those, and naming them here corrupts the result. Simply describe the world and the moment, the way you'd tell a friend what is happening in the photo.
-- Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy."
+- Keep it concrete and physical — real places, real objects, real body language. Describe OBSERVABLE REALITY, not emotional abstractions. BANNED mood words: "dark", "moody", "mysterious", "atmospheric", "lonely", "ethereal", "melancholic atmosphere", "meditative energy" — instead describe the physical thing that creates that feeling (e.g. "a single streetlamp behind her as the block empties out" rather than "lonely and mysterious").
 
 SUBJECT CONSTRUCTION (CRITICAL — choose WHO fits the song, and make them MEMORABLE):
 - First DECIDE WHO belongs on this cover — never default to a young woman. Read the genre, mood, lyrics and feeling, then choose the gender, an age that actually fits the song (a teenager, someone in their 20s, their 30s-40s, an elder — whatever the music implies), body type, and a cultural context that matches the sound. Men, women, older people and unconventional-looking people all belong here. Vary this every time based on the track.
@@ -115,7 +115,7 @@ SUBJECT CONSTRUCTION (CRITICAL — choose WHO fits the song, and make them MEMOR
 - Dress them in SPECIFIC, interesting clothing with real fabric and cut — e.g. woven aso-oke, burnt-orange velvet, wax-print tailoring, a metallic bomber, sheer mesh, layered leather, handwoven knit, a tailored suit — never a plain "black top."
 - Keep the PERSON to 2-4 vivid concrete details (who they are + one memorable marker + specific wardrobe + a real expression). Do NOT exhaustively list every feature — leave room for the world and the action below.
 - BANNED vague words for people: "beautiful", "stunning", "gorgeous", "attractive", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone". Replace each with concrete, distinctive detail.
-- Faceless silhouettes are allowed ONLY for SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION; otherwise the face and features are visible.
+- The subject's face is LIT and clearly visible — write it that way. Never describe the face as shadowed, hidden, obscured, silhouetted or turned fully away UNLESS the chosen technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION. The person is the focal point; the background never outshines them.
 
 ENVIRONMENT & MOMENT (CRITICAL — a cover is a PLACE and a MOMENT, not a floating portrait):
 - Set the scene in ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor." E.g. a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals on wooden tables, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party. Give the place genuine presence in the frame.
@@ -769,9 +769,13 @@ router.patch('/refine', requireAuth, async (req, res) => {
   const { upload_id, lyric_context, image_url } = req.body;
   const userId = req.user.id;
 
-  if (!upload_id || !lyric_context?.trim()) {
-    return res.status(400).json({ error: 'upload_id and modified lyric_context parameters are required.' });
+  // lyric_context (a modification request) is now OPTIONAL: with no text, refine
+  // simply re-rolls a fresh take from the stored brief so the button always
+  // produces a new cover instead of 400-ing.
+  if (!upload_id) {
+    return res.status(400).json({ error: 'upload_id is required.' });
   }
+  const modRequest = (lyric_context || '').trim();
 
   try {
     const [uploadResult, profileResult] = await Promise.all([
@@ -797,23 +801,24 @@ router.patch('/refine', requireAuth, async (req, res) => {
 
     const refinementPrompt = `${AESTHETIC_SYSTEM_PROMPT}
 
-You are refining an existing cover art brief based on direct artist feedback — keep the same technique unless the modification request clearly demands a different one.
+You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — keep the same technique unless the request clearly demands a different one.
 
 INPUT REFINEMENT VARIABLES:
-1. Modification Request: "${lyric_context.trim()}"
-2. Previous Design Coordinates: ${image_url || 'Baseline generation profile'}
+1. Modification Request: "${modRequest || 'No specific change requested — generate a distinctly different alternate take of the same concept: a new pose, moment, angle or setting detail.'}"
+2. Existing Brief: ${deserializeBrief(upload.sentence_prompt)?.scene || 'Baseline generation profile'}
 3. Underlying Track Sonic Signature: ${trackSonicFeatures}`;
 
+    const refineFallback = modRequest || deserializeBrief(upload.sentence_prompt)?.scene || 'Abstract intense emotion'
     let technique, scene
     try {
       ({ technique, scene } = await generateSafeScene(refinementPrompt, {
-        temperature: 0.75,
-        fallbackScene: lyric_context.trim(),
+        temperature: 0.8,
+        fallbackScene: refineFallback,
       }))
     } catch (gErr) {
       console.error(`⚠️ Refinement expansion fallback applied after retries: ${gErr?.message || gErr}`);
       technique = DEFAULT_TECHNIQUE
-      scene = lyric_context.trim()
+      scene = refineFallback
     }
 
     const { prompt: absoluteFluxRefinedPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {

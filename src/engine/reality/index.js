@@ -46,16 +46,26 @@ const REALITY_NEGATIVES = [
  * check). `singleSubject` adds an explicit one-person constraint — the most
  * common failure mode (e.g. an unwanted second person / dancing couple).
  */
-function photographicRealityTail({ singleSubject = false } = {}) {
+function photographicRealityTail({ singleSubject = false, faceVisible = true } = {}) {
   const solo = singleSubject
     ? 'Exactly one person in frame, no second person, no crowd. '
     : ''
+  // SUBJECT PRIMACY — the single most important quality constraint. Mood must
+  // never bury the subject: even in a dark or backlit scene the face has to be
+  // clearly lit and readable, and it must be the brightest focal anchor.
+  // Suppressed only for genuine silhouette techniques (faceVisible=false).
+  const face = faceVisible
+    ? 'The subject is the clear focal anchor filling 30-45% of the frame, their face clearly lit from the front and fully visible with readable eyes, expression and skin detail; background lights, bokeh and haze stay dimmer than the face and never silhouette, black out or obscure it. '
+    : ''
+  const faceNeg = faceVisible
+    ? ', a blacked-out or fully silhouetted face, a face lost to shadow, a background brighter than the subject'
+    : ''
   return (
     'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
-    solo +
+    solo + face +
     'Shot on a real camera and hand-graded — ' +
     REALITY_POSITIVES.join(', ') + '. ' +
-    'Absolutely no ' + REALITY_NEGATIVES.join(', ') + '. ' +
+    'Absolutely no ' + REALITY_NEGATIVES.join(', ') + faceNeg + '. ' +
     'No text, letters, watermarks or logos rendered anywhere in the image.'
   )
 }

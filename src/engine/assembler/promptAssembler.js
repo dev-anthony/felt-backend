@@ -15,7 +15,7 @@
  *   texture+post → symbolism → technique suffix → quality guardrails
  */
 
-const { getSuffix } = require('../technique')
+const { getSuffix, techniqueHidesFace } = require('../technique')
 const { getConcept } = require('../vocabulary')
 const { photographicRealityTail, illustrationRealityTail } = require('../reality')
 
@@ -110,7 +110,7 @@ function assemblePrompt({ blueprint, dna, allowGroup = false }) {
     //     Doubles as the quality tail. Single-subject unless the caller opts into
     //     a group (default guards against the common unwanted-second-person leak).
     photographic
-      ? photographicRealityTail({ singleSubject: !allowGroup })
+      ? photographicRealityTail({ singleSubject: !allowGroup, faceVisible: !techniqueHidesFace(technique) })
       : illustrationRealityTail(),
   ]
 
