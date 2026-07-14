@@ -10,12 +10,40 @@ const uploadRoutes = require('./src/routes/uploads')
 const generationRoutes = require('./src/routes/generation')
 
 const app = express()
-app.enable('trust proxy')
-const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000', 
-  'http://localhost:3000']
-app.use(cors({ origin: allowedOrigins, credentials: true }))
-app.use(express.json())
-app.use(cookieParser())
+// app.enable('trust proxy')
+// const allowedOrigins = [process.env.FRONTEND_URL || 'http://localhost:3000', 
+//   'http://localhost:3000']
+// app.use(cors({ origin: allowedOrigins, credentials: true }))
+// app.use(express.json())
+// app.use(cookieParser())
+app.enable('trust proxy');
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://usefelt.online',
+  'https://www.usefelt.online',
+  'https://felt-rouge-six.vercel.app',
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow requests without an Origin header (Postman, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
+app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes)
