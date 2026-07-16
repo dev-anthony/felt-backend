@@ -56,7 +56,9 @@ const TECHNIQUES = {
     dnaBias: { motion: +0.15, danceability: +0.06 },
   },
   MIRROR_DOUBLE_EXPOSURE: {
-    suffix: 'Both layers were exposed onto the same physical frame in camera.',
+    // No film claim: this technique's stock is film_digital_clean (the only
+    // palette-neutral option, needed to keep its cobalt duotone coherent).
+    suffix: 'Both layers are one single in-camera exposure, not two images blended afterward.',
     dnaBias: { darkness: +0.06, intimacy: +0.06 },
   },
   STUDIO_SEAMLESS_EDITORIAL: {
@@ -92,6 +94,10 @@ function techniqueHidesFace(name) {
 const TECHNIQUE_AFFINITY = {
   FLASH_DOCUMENTARY: {
     camera: ['cam_35mm_point_shoot', 'cam_disposable'], lens: ['lens_35mm_hyperfocal', 'lens_50mm_f14'],
+    // Consumer/night film — agrees with the warm colours, the flash, the grain
+    // and the huji/light-leak overlays. Ektachrome's "punchy primaries" would
+    // fight color_muted_earth; Tri-X's B&W would fight both colour options.
+    filmStock: ['film_gold_200', 'film_cinestill_800t'],
     lighting: ['light_direct_flash', 'light_practical_haze'], composition: ['comp_offcenter_negative', 'comp_low_angle_hero'],
     motion: ['motion_freeze', 'motion_strobe_freeze'], texture: ['tex_heavy_grain', 'tex_fine_film_grain'],
     color: ['color_warm_tropical', 'color_muted_earth'], postProcessing: ['post_huji_filter', 'post_light_leak'],
@@ -114,8 +120,20 @@ const TECHNIQUE_AFFINITY = {
   },
   SILHOUETTE_ATMOSPHERE: {
     camera: ['cam_anamorphic_cine'], lens: ['lens_24mm_wide', 'lens_85mm_portrait'],
+    // CineStill 800T's "red halation blooming around lights" is the literal
+    // subject of this technique ("the light source, not the face"). It also ends
+    // the confirmed demo bug where an anchor-free filmStock pulled Ektachrome's
+    // "punchy, clean primaries" against a "near-monochrome" grade.
+    filmStock: ['film_cinestill_800t'],
     lighting: ['light_rim_backlight', 'light_spotlight_halo'], composition: ['comp_monumental_scale', 'comp_offcenter_negative'],
-    color: ['color_monochrome_dark', 'color_duotone_cobalt'], texture: ['tex_fine_film_grain'], postProcessing: ['post_vignette'],
+    // color_duotone_cobalt dropped: a cool blue wash contradicts CineStill's warm
+    // tungsten palette. monochrome_dark's "single restrained accent" IS that warm
+    // light. (Cobalt still lives in MIRROR, which uses a palette-neutral stock.)
+    color: ['color_monochrome_dark'],
+    // Held, silent and atmospheric — without this the anchor could pull
+    // motion_shutter_drag's "blur trails" into a technique built on stillness.
+    motion: ['motion_still_meditative', 'motion_freeze'],
+    texture: ['tex_fine_film_grain'], postProcessing: ['post_vignette'],
     editorial: ['edit_fine_art', 'edit_luxury'],
     symbolism: ['sym_monolith', 'sym_solar_halo'],
   },
@@ -123,6 +141,11 @@ const TECHNIQUE_AFFINITY = {
     camera: ['cam_35mm_point_shoot', 'cam_hasselblad_h6d'], lens: ['lens_80mm_f28'],
     lighting: ['light_chiaroscuro', 'light_direct_flash'], composition: ['comp_tight_enclosure', 'comp_centered_symmetry'],
     filmStock: ['film_trix_400'], texture: ['tex_heavy_grain'], color: ['color_monochrome_dark'],
+    // The staged prop must read clearly — blur would destroy the whole point.
+    motion: ['motion_freeze'],
+    // "Shot in camera" realism: no added overlay, or at most a vignette that
+    // agrees with the chiaroscuro/monochrome darkness.
+    postProcessing: ['post_none', 'post_vignette'],
     // fine-art agrees with the deliberately staged, centered/enclosed framing
     editorial: ['edit_fine_art'],
     // the staged physical object IS this technique's identity
@@ -136,6 +159,9 @@ const TECHNIQUE_AFFINITY = {
     // film_cinestill_800t's warm tungsten palette / red halation. Crimson agrees
     // with it. (Cobalt remains available under SILHOUETTE and MIRROR.)
     color: ['color_duotone_crimson'],
+    // This technique's identity is grain visible UNDERNEATH the colour wash —
+    // "the colour lives in the emulsion", so the emulsion has to be visible.
+    texture: ['tex_fine_film_grain'],
     motion: ['motion_still_meditative'], postProcessing: ['post_vignette'],
     // Fix 1: was picking edit_documentary ("unstyled/candid") against
     // comp_centered_symmetry ("symmetrical centered") — opposite approaches.
@@ -143,14 +169,26 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   MACRO_INTIMATE_DETAIL: {
-    camera: ['cam_hasselblad_h6d', 'cam_mamiya_rz67'], lens: ['lens_100mm_macro', 'lens_85mm_portrait'],
+    // cam_mamiya_rz67 dropped: it is a FILM camera, which contradicts both
+    // tex_clean_detail's "pristine sensor clarity" and the digital stock below.
+    // The Hasselblad is a digital medium-format back — they agree.
+    camera: ['cam_hasselblad_h6d'], lens: ['lens_100mm_macro', 'lens_85mm_portrait'],
+    // Palette-neutral and sharp — agrees with "pristine sensor clarity" and with
+    // both pastel/muted colour options. A warm film stock would fight the pastel.
+    filmStock: ['film_digital_clean'],
     lighting: ['light_north_window', 'light_high_key_wrap'], composition: ['comp_extreme_closeup'],
     texture: ['tex_clean_detail'], color: ['color_high_key_pastel', 'color_muted_earth'], motion: ['motion_still_meditative'],
+    // "Completely unretouched" — no overlay pass.
+    postProcessing: ['post_none'],
     editorial: ['edit_fine_art', 'edit_luxury'],
     symbolism: ['sym_none'],
   },
   MOTION_BLUR_STROBE: {
     camera: ['cam_leica_m10'], lens: ['lens_50mm_f14', 'lens_35mm_hyperfocal'],
+    // Night/tungsten film: CineStill's red halation around lights suits the
+    // flash-and-practicals club setting and agrees with BOTH colour options
+    // (warm tropical, crimson duotone). Also keeps it analog, matching the Leica.
+    filmStock: ['film_cinestill_800t', 'film_gold_200'],
     lighting: ['light_direct_flash', 'light_practical_haze'], composition: ['comp_offcenter_negative', 'comp_low_angle_hero'],
     motion: ['motion_shutter_drag', 'motion_strobe_freeze'], texture: ['tex_fine_film_grain'],
     color: ['color_warm_tropical', 'color_duotone_crimson'], postProcessing: ['post_light_leak'],
@@ -159,6 +197,12 @@ const TECHNIQUE_AFFINITY = {
   },
   MIRROR_DOUBLE_EXPOSURE: {
     camera: ['cam_leica_m10', 'cam_hasselblad_h6d'], lens: ['lens_85mm_portrait', 'lens_50mm_f14'],
+    // Palette-neutral by necessity: this is the one technique that must keep the
+    // cool cobalt duotone available, and every other stock makes a colour claim
+    // (warm/B&W/saturated) that would fight it.
+    filmStock: ['film_digital_clean'],
+    // Agrees with the clean digital capture above.
+    texture: ['tex_clean_detail'],
     lighting: ['light_chiaroscuro', 'light_single_gel'], composition: ['comp_centered_symmetry'],
     motion: ['motion_double_exposure'],
     // Fix 2: dropped color_cross_processed — its two-hue shift ("greenish
@@ -176,14 +220,21 @@ const TECHNIQUE_AFFINITY = {
     // Fix 2: dropped color_high_key_pastel — "soft airy pastel" fought
     // film_ektachrome's "punchy, clean primaries" saturation.
     color: ['color_bold_seamless'],
+    // Posed studio editorial — sharp. Blur would contradict the whole setup.
+    motion: ['motion_freeze'],
     texture: ['tex_clean_detail'], postProcessing: ['post_none'],
     editorial: ['edit_fashion', 'edit_luxury'],
     symbolism: ['sym_none'],
   },
   MONUMENTAL_SCALE_ISOLATION: {
     camera: ['cam_anamorphic_cine'], lens: ['lens_24mm_wide'],
+    // Warm, muted, analog — agrees with golden-hour light, muted_earth, and the
+    // film grain. Ektachrome's punchy primaries would fight the muted palette.
+    filmStock: ['film_portra_400', 'film_gold_200'],
     lighting: ['light_golden_hour', 'light_rim_backlight'], composition: ['comp_monumental_scale'],
     color: ['color_muted_earth', 'color_monochrome_dark'], motion: ['motion_still_meditative'], texture: ['tex_fine_film_grain'],
+    // Atmospheric falloff, or nothing — both agree with the haze in the suffix.
+    postProcessing: ['post_vignette', 'post_none'],
     editorial: ['edit_fine_art', 'edit_luxury'],
     symbolism: ['sym_monolith', 'sym_open_road'],
   },

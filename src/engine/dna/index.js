@@ -75,14 +75,31 @@ function computeVisualDNA(rawFeatures, techniqueName) {
   let confWeight = 0
 
   for (const layer of LAYERS) {
-    const candidates = getCategory(layer.category)
-    const { selection } = selectConcept(candidates, biased, {
+    const all = getCategory(layer.category)
+
+    // ART DIRECTION IS A SHORTLIST, NOT A NUDGE.
+    // When the technique names the concepts it wants for this layer, the music
+    // chooses AMONG those — it cannot leave the set. This was previously only a
+    // +0.30 scoring bonus, which an extreme track could outvote: an aggressive
+    // drill song pulled `motion_strobe_freeze` (0.878) over the art-directed
+    // `motion_freeze` (0.854) inside SILHOUETTE_ATMOSPHERE — a technique built
+    // on stillness. A soft bonus can always lose by a hair, which silently
+    // reintroduces exactly the cross-layer contradictions the affinity table
+    // exists to prevent.
+    //
+    // Variety is preserved: the anchor still picks between the technique's
+    // options (plus seeded near-tie exploration), so different songs under the
+    // same technique still diverge. Layers with no affinity (subject,
+    // environment, artMedium, graphic, typography) score freely as before.
+    const shortlist = getAffinity(technique, layer.key)
+    const candidates = shortlist.length
+      ? all.filter((c) => shortlist.includes(c.id))
+      : all
+
+    const { selection } = selectConcept(candidates.length ? candidates : all, biased, {
       technique,
       explore: layer.explore,
       techniqueBonus: layer.bonus,
-      // Art-direction coherence: the technique names its preferred concepts for
-      // this layer, so camera/lens/lighting/etc. speak one visual language.
-      preferredIds: getAffinity(technique, layer.key),
     })
     const chosen = selection || fallbackSelection(layer)
     chosen.layer = layer.key

@@ -59,7 +59,7 @@ function sentence(parts) {
  *   on a man calmly drinking coffee).
  * @returns {import('../types').AssembledPrompt}
  */
-function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfidence = 0 }) {
+function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfidence = 0, noPeople = false }) {
   const b = blueprint || {}
   const technique = dna.technique
 
@@ -122,7 +122,11 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
     //     Doubles as the quality tail. Single-subject unless the caller opts into
     //     a group (default guards against the common unwanted-second-person leak).
     photographic
-      ? photographicRealityTail({ singleSubject: !allowGroup, faceVisible: !techniqueHidesFace(technique) })
+      ? photographicRealityTail({
+          singleSubject: !allowGroup,
+          faceVisible: !techniqueHidesFace(technique),
+          noPeople,
+        })
       : illustrationRealityTail(),
   ]
 

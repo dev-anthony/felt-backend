@@ -43,7 +43,23 @@ const REALITY_NEGATIVES = [
  * check). `singleSubject` adds an explicit one-person constraint — the most
  * common failure mode (e.g. an unwanted second person / dancing couple).
  */
-function photographicRealityTail({ singleSubject = false, faceVisible = true } = {}) {
+function photographicRealityTail({ singleSubject = false, faceVisible = true, noPeople = false } = {}) {
+  // `noPeople` is the artist's declared preference. It has to suppress BOTH the
+  // single-subject and face-visibility clauses, otherwise the tail would demand
+  // "exactly one person, face front-lit" on a cover that must contain nobody.
+  if (noPeople) {
+    return (
+      'A 1:1 square streaming cover, edge to edge, no border. ' +
+      'No people at all in the frame — no person, figure, silhouette, body part or hands. ' +
+      'Shot on a real camera — ' +
+      'authentic material texture and real fabric/surface weight, ' +
+      'physically plausible light with shadows in one direction, ' +
+      'realistic lens depth of field with soft background separation. ' +
+      'Absolutely no ' + REALITY_NEGATIVES.join(', ') + '. ' +
+      'No text or logos anywhere.'
+    )
+  }
+
   const solo = singleSubject
     ? 'Exactly one person in frame, no second person, no crowd. '
     : ''
