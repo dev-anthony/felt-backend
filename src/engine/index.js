@@ -21,6 +21,13 @@ const technique = require('./technique')
 const vocabulary = require('./vocabulary')
 
 /**
+ * Minimum DNA symbolism confidence for the deterministic path. Below this the
+ * motif is treated as `sym_none` and omitted rather than attached to a scene it
+ * was never matched against.
+ */
+const DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE = 0.6
+
+/**
  * DETERMINISTIC prompt build — no Gemini call. The `sceneText` (already written
  * upstream) becomes the story; the DNA supplies every visual/technical block.
  * @returns {import('./types').AssembledPrompt}
@@ -39,7 +46,11 @@ function assembleFromScene({ features, techniqueName, sceneText, dna: providedDn
     narrative: '',
     symbolism: 'none',
   }
-  return assemblePrompt({ blueprint, dna })
+  // This path has no Gemini-chosen symbolism, so `assemblePrompt` would fall back
+  // to the DNA's own pick for EVERY scene — a pick never checked against the
+  // scene text. Require a confident match before letting a motif attach, so a
+  // weakly-matched object isn't glued onto an unrelated scene.
+  return assemblePrompt({ blueprint, dna, symbolismMinConfidence: DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE })
 }
 
 /**
