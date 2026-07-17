@@ -184,7 +184,7 @@ router.get('/', requireAuth, async (req, res) => {
       .select(`
         id, title, track_type, status, audio_url, audio_features, sentence_prompt, created_at,
         generations:generations!upload_id (
-          id, image_url, status, created_at, prompt_used
+          id, image_url, status, created_at, prompt_used, technique
         )
       `, { count: 'exact' })
       .eq('user_id', userId)

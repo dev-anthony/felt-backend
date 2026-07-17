@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const supabase = require('../utils/supabase')
 const { requireAuth } = require('../middleware/authmiddleware')
+const { isValidGenre, isValidSubjectMode } = require('../config/artistProfile')
 
 /**
  * GET /api/user/me
@@ -22,7 +23,8 @@ router.get('/me', requireAuth, async (req, res) => {
         avatar_url,
         sound_words,
         city,
-        default_aesthetic_id,
+        default_genre,
+        default_subject_mode,
         onboarding_complete,
         created_at
       `)
@@ -49,14 +51,14 @@ router.get('/me', requireAuth, async (req, res) => {
 /**
  * PATCH /api/user/me
  * Header: Authorization: Bearer <access_token>
- * Body: any subset of { name, sound_words, city, default_aesthetic_id, avatar_url }
+ * Body: any subset of { name, sound_words, city, avatar_url }
  * Partial update — only fields you send get changed.
  * Used for profile edits post-onboarding.
  */
 router.patch('/me', requireAuth, async (req, res) => {
   const userId = req.user.id
 
-  const ALLOWED_FIELDS = ['name', 'sound_words', 'city', 'default_aesthetic_id', 'avatar_url']
+  const ALLOWED_FIELDS = ['name', 'sound_words', 'city', 'default_genre', 'default_subject_mode', 'avatar_url']
 
   // Strip anything that isn't an allowed field — no one gets to patch id or email
   const updates = Object.fromEntries(
@@ -74,6 +76,15 @@ router.patch('/me', requireAuth, async (req, res) => {
     }
   }
 
+  // Both drive the generation pipeline, so only known ids may be stored.
+  if (updates.default_genre !== undefined && !isValidGenre(updates.default_genre)) {
+    return res.status(400).json({ error: 'default_genre is not a recognised genre id.' })
+  }
+
+  if (updates.default_subject_mode !== undefined && !isValidSubjectMode(updates.default_subject_mode)) {
+    return res.status(400).json({ error: 'default_subject_mode is not a recognised subject mode id.' })
+  }
+
   try {
     const { data, error } = await supabase
       .from('users')
@@ -86,7 +97,8 @@ router.patch('/me', requireAuth, async (req, res) => {
         avatar_url,
         sound_words,
         city,
-        default_aesthetic_id,
+        default_genre,
+        default_subject_mode,
         onboarding_complete,
         created_at
       `)

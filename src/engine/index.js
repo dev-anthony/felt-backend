@@ -21,11 +21,18 @@ const technique = require('./technique')
 const vocabulary = require('./vocabulary')
 
 /**
+ * Minimum DNA symbolism confidence for the deterministic path. Below this the
+ * motif is treated as `sym_none` and omitted rather than attached to a scene it
+ * was never matched against.
+ */
+const DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE = 0.6
+
+/**
  * DETERMINISTIC prompt build — no Gemini call. The `sceneText` (already written
  * upstream) becomes the story; the DNA supplies every visual/technical block.
  * @returns {import('./types').AssembledPrompt}
  */
-function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna }) {
+function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna, noPeople = false }) {
   const dna = providedDna || computeVisualDNA(features, techniqueName)
   // The scene sentence already contains the subject AND the setting (it is the
   // whole story), so we do NOT inject the DNA subject archetype — doing so would
@@ -39,7 +46,16 @@ function assembleFromScene({ features, techniqueName, sceneText, dna: providedDn
     narrative: '',
     symbolism: 'none',
   }
-  return assemblePrompt({ blueprint, dna })
+  // This path has no Gemini-chosen symbolism, so `assemblePrompt` would fall back
+  // to the DNA's own pick for EVERY scene — a pick never checked against the
+  // scene text. Require a confident match before letting a motif attach, so a
+  // weakly-matched object isn't glued onto an unrelated scene.
+  return assemblePrompt({
+    blueprint,
+    dna,
+    noPeople,
+    symbolismMinConfidence: DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE,
+  })
 }
 
 /**
@@ -48,7 +64,7 @@ function assembleFromScene({ features, techniqueName, sceneText, dna: providedDn
  * @param {(promptText:string, opts?:object)=>Promise<string>} args.generate
  * @returns {Promise<import('./types').AssembledPrompt & { compilerFallback: boolean }>}
  */
-async function orchestrate({ generate, features, techniqueName, userFeeling, lyricsTheme, mood, fallbackScene }) {
+async function orchestrate({ generate, features, techniqueName, userFeeling, lyricsTheme, mood, fallbackScene, noPeople = false }) {
   const dna = computeVisualDNA(features, techniqueName)
   const { blueprint, fallback } = await compileScene({
     generate,
@@ -59,7 +75,7 @@ async function orchestrate({ generate, features, techniqueName, userFeeling, lyr
     mood: mood || dna.vector.meta.mood,
     fallbackScene,
   })
-  const assembled = assemblePrompt({ blueprint, dna })
+  const assembled = assemblePrompt({ blueprint, dna, noPeople })
   return { ...assembled, compilerFallback: fallback }
 }
 

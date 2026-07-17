@@ -19,18 +19,22 @@
 
 // Positive constraints — what a real photograph physically contains. Kept tight
 // so the tail survives inside the image provider's prompt-length budget.
+// Same constraints as before, said in the fewest words that still carry the
+// intent (Fix 4) — this tail was ~35-40% of total prompt length, crowding out
+// the creative content. Nothing dropped: anatomy, hands, skin, fabric, eyes,
+// shadow direction and the AI-tell negatives are all still here.
 const REALITY_POSITIVES = [
-  'correct anatomy with real weight and natural five-fingered hands',
-  'skin with subsurface scattering, visible pores, fine lines and natural oils, never waxy or airbrushed',
-  'a specific asymmetric face with individual bone structure, not a doll',
-  'clothing with real fabric weight and drape that holds its own shape, contact shadows where cloth meets skin',
-  'catchlights in the eyes and shadows in one consistent direction',
+  'correct anatomy, real weight, natural five-fingered hands',
+  'skin with subsurface scattering, visible pores and natural oils, never waxy',
+  'a specific asymmetric face, not a doll',
+  'clothing with real fabric weight and drape, contact shadows where cloth meets skin',
+  'catchlights in the eyes, shadows in one direction',
 ]
 
 // Negative constraints — the recognizable fingerprints of AI generation.
 const REALITY_NEGATIVES = [
-  'plastic or waxy skin', 'poreless airbrushed faces', 'malformed or extra fingers',
-  'warped doll-like faces', 'duplicated limbs', 'floating or shapeless garments', 'over-smoothed CGI look',
+  'waxy plastic skin', 'airbrushed poreless faces', 'malformed or extra fingers',
+  'warped doll faces', 'duplicated limbs', 'floating shapeless garments', 'over-smoothed CGI',
 ]
 
 /**
@@ -39,7 +43,23 @@ const REALITY_NEGATIVES = [
  * check). `singleSubject` adds an explicit one-person constraint — the most
  * common failure mode (e.g. an unwanted second person / dancing couple).
  */
-function photographicRealityTail({ singleSubject = false, faceVisible = true } = {}) {
+function photographicRealityTail({ singleSubject = false, faceVisible = true, noPeople = false } = {}) {
+  // `noPeople` is the artist's declared preference. It has to suppress BOTH the
+  // single-subject and face-visibility clauses, otherwise the tail would demand
+  // "exactly one person, face front-lit" on a cover that must contain nobody.
+  if (noPeople) {
+    return (
+      'A 1:1 square streaming cover, edge to edge, no border. ' +
+      'No people at all in the frame — no person, figure, silhouette, body part or hands. ' +
+      'Shot on a real camera — ' +
+      'authentic material texture and real fabric/surface weight, ' +
+      'physically plausible light with shadows in one direction, ' +
+      'realistic lens depth of field with soft background separation. ' +
+      'Absolutely no ' + REALITY_NEGATIVES.join(', ') + '. ' +
+      'No text or logos anywhere.'
+    )
+  }
+
   const solo = singleSubject
     ? 'Exactly one person in frame, no second person, no crowd. '
     : ''
@@ -48,7 +68,7 @@ function photographicRealityTail({ singleSubject = false, faceVisible = true } =
   // clearly lit and readable, and it must be the brightest focal anchor.
   // Suppressed only for genuine silhouette techniques (faceVisible=false).
   const face = faceVisible
-    ? 'The subject is the clear focal point filling 30-45% of the frame, face lit from the front and fully readable, never darker than the background. '
+    ? 'Subject is the focal point at 30-45% of frame, face front-lit and readable, never darker than the background. '
     : ''
   const faceNeg = faceVisible ? ', a blacked-out or silhouetted face, a background brighter than the subject' : ''
   return (

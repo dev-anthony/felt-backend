@@ -50,17 +50,29 @@ function sentence(parts) {
  * @param {import('../types').VisualDNA} args.dna
  * @param {boolean} [args.allowGroup] permit more than one person in frame
  *   (default false — guards against the common unwanted second-person result)
+ * @param {number} [args.symbolismMinConfidence] minimum DNA symbolism confidence
+ *   required before its motif may be glued onto the scene. 0 (default) keeps the
+ *   Gemini-compiler path unchanged — there Gemini names symbolism explicitly.
+ *   The deterministic path passes a threshold, because the DNA's symbolism pick
+ *   is never checked against the actual scene text and a low-confidence match
+ *   produced unrelated objects (e.g. "an object piercing the body under tension"
+ *   on a man calmly drinking coffee).
  * @returns {import('../types').AssembledPrompt}
  */
-function assemblePrompt({ blueprint, dna, allowGroup = false }) {
+function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfidence = 0, noPeople = false }) {
   const b = blueprint || {}
   const technique = dna.technique
 
   // Symbolism: prefer the concrete object Gemini staged; fall back to the DNA
-  // motif only when the DNA actually proposed one (not sym_none).
+  // motif only when the DNA actually proposed one (not sym_none) AND it cleared
+  // the caller's confidence bar.
   const dnaSymbolism = dna.selections.symbolism
   const blueprintSym = b.symbolism && b.symbolism.toLowerCase() !== 'none' ? b.symbolism : ''
-  const dnaSym = dnaSymbolism && dnaSymbolism.conceptId !== 'sym_none' ? dnaSymbolism.fragment : ''
+  const dnaSymConfident =
+    dnaSymbolism &&
+    dnaSymbolism.conceptId !== 'sym_none' &&
+    (dnaSymbolism.confidence ?? 0) >= symbolismMinConfidence
+  const dnaSym = dnaSymConfident ? dnaSymbolism.fragment : ''
   const symbolism = blueprintSym || dnaSym
 
   const photographic = isPhotographicMedium(dna)
@@ -110,7 +122,11 @@ function assemblePrompt({ blueprint, dna, allowGroup = false }) {
     //     Doubles as the quality tail. Single-subject unless the caller opts into
     //     a group (default guards against the common unwanted-second-person leak).
     photographic
-      ? photographicRealityTail({ singleSubject: !allowGroup, faceVisible: !techniqueHidesFace(technique) })
+      ? photographicRealityTail({
+          singleSubject: !allowGroup,
+          faceVisible: !techniqueHidesFace(technique),
+          noPeople,
+        })
       : illustrationRealityTail(),
   ]
 

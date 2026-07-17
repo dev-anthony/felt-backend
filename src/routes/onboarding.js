@@ -3,6 +3,7 @@ const router = express.Router()
 const multer = require('multer')
 const supabase = require('../utils/supabase')
 const { requireAuth } = require('../middleware/authmiddleware');
+const { GENRES, SUBJECT_MODES, isValidGenre, isValidSubjectMode } = require('../config/artistProfile');
 
 // Store file in memory as a buffer — we pass it straight to Supabase, no disk involved
 const upload = multer({
@@ -62,13 +63,25 @@ router.post('/upload-avatar', requireAuth, upload.single('avatar'), async (req, 
 })
 
 /**
+ * GET /api/onboarding/options
+ * The genre + subject-mode choices, served from the backend so the onboarding
+ * and profile screens can never drift from what the API actually validates.
+ */
+router.get('/options', (req, res) => {
+  return res.status(200).json({
+    genres: GENRES.map(({ id, label }) => ({ id, label })),
+    subjectModes: SUBJECT_MODES.map(({ id, label }) => ({ id, label })),
+  })
+})
+
+/**
  * POST /api/onboarding/complete
  * Header: Authorization: Bearer <access_token>
- * Body: { soundWords, city, defaultAestheticId, avatarUrl }
+ * Body: { soundWords, city, genre, subjectMode, avatarUrl }
  * avatarUrl comes from the /upload-avatar response above.
  */
 router.post('/complete', requireAuth, async (req, res) => {
-  const { soundWords, city, defaultAestheticId, avatarUrl } = req.body
+  const { soundWords, city, genre, subjectMode, avatarUrl } = req.body
   const userId = req.user.id
 
   if (!soundWords || soundWords.length !== 3) {
@@ -79,8 +92,12 @@ router.post('/complete', requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'City is required' })
   }
 
-  if (!defaultAestheticId) {
-    return res.status(400).json({ error: 'A visual aesthetic selection is required' })
+  if (!isValidGenre(genre)) {
+    return res.status(400).json({ error: 'A valid genre selection is required' })
+  }
+
+  if (!isValidSubjectMode(subjectMode)) {
+    return res.status(400).json({ error: 'A valid subject preference is required' })
   }
 
   try {
@@ -89,12 +106,13 @@ router.post('/complete', requireAuth, async (req, res) => {
       .update({
         sound_words: soundWords,
         city,
-        default_aesthetic_id: defaultAestheticId,
+        default_genre: genre,
+        default_subject_mode: subjectMode,
         avatar_url: avatarUrl || null,
         onboarding_complete: true,
       })
       .eq('id', userId)
-      .select('id, email, name, avatar_url, sound_words, city, default_aesthetic_id')
+      .select('id, email, name, avatar_url, sound_words, city, default_genre, default_subject_mode')
       .single()
 
     if (error) {

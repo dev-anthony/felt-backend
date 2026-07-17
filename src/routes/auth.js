@@ -147,7 +147,7 @@ router.post('/login', async (req, res) => {
 
     const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('id, email, name, avatar_url, sound_words, city, default_aesthetic_id, onboarding_complete')
+      .select('id, email, name, avatar_url, sound_words, city, onboarding_complete')
       .eq('id', data.user.id)
       .single()
 

@@ -28,6 +28,10 @@ const {
   isValidTechnique,
 } = require('../engine/technique')
 
+// The artist's declared genre corrects Essentia's culture-blind guess, and their
+// subject mode decides whether a person may appear at all.
+const { genreLineage, subjectModeRule } = require('../config/artistProfile')
+
 // Raw single-shot Gemini text call, injected into the engine's Compiler so the
 // engine stays decoupled from the SDK. Mirrors generateWithRetry's transport
 // without the technique/scene parsing (the Compiler wants raw JSON text back).
@@ -108,7 +112,7 @@ STORY-ONLY RULE (CRITICAL):
 - You write the STORY, never the photography. Describe ONLY: who or what is in frame, where they are, what they are physically doing, their expression/posture, and at most ONE physical symbolic object.
 - Do NOT mention any camera, lens, film stock, lighting, shadows, rim light, color grade, hue, grain, exposure, vignette, or post-processing. A separate system already decides every one of those, and naming them here corrupts the result. Simply describe the world and the moment, the way you'd tell a friend what is happening in the photo.
 - Keep it concrete and physical — real places, real objects, real body language. Describe OBSERVABLE REALITY, not emotional abstractions. BANNED mood words: "dark", "moody", "mysterious", "atmospheric", "lonely", "ethereal", "melancholic atmosphere", "meditative energy" — instead describe the physical thing that creates that feeling (e.g. "a single streetlamp behind her as the block empties out" rather than "lonely and mysterious").
-
+00333
 SUBJECT CONSTRUCTION (CRITICAL — choose WHO fits the song, and make them MEMORABLE):
 - First DECIDE WHO belongs on this cover — never default to a young woman. Read the genre, mood, lyrics and feeling, then choose the gender, an age that actually fits the song (a child, a teenager, someone in their 20s-40s, an elder — whatever the music implies), body type, and a cultural context that matches the sound. Men, women, children, older people and unconventional-looking people all belong here. Vary this every time based on the track.
 - ANATOMY ANCHORS: state their build and one or two bone-structure facts so the figure has real mass — e.g. "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks", "long angular jaw". Never "a figure".
@@ -188,7 +192,7 @@ function buildFluxPrompt(technique, scene) {
  *
  * Any engine error degrades safely to the legacy buildFluxPrompt.
  */
-async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood } = {}) {
+async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false } = {}) {
   try {
     if (useCompiler) {
       const result = await engine.orchestrate({
@@ -199,10 +203,11 @@ async function buildFinalPrompt(technique, scene, features, { useCompiler = fals
         lyricsTheme: scene,
         mood,
         fallbackScene: scene,
+        noPeople,
       })
       return { prompt: result.prompt, technique: result.technique, dna: result.dna }
     }
-    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene })
+    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene, noPeople })
     return { prompt: built.prompt, technique: built.technique, dna: built.dna }
   } catch (err) {
     console.warn(`[ENGINE] Visual DNA build failed, using legacy prompt: ${err?.message || err}`)
@@ -270,12 +275,21 @@ function deserializeBrief(stored) {
   return { technique: DEFAULT_TECHNIQUE, scene: stored }
 }
 
-const audioFeaturesToVisualDescription = (features) => {
-  if (!features) return "Audio structural variables aligned to standard baseline frequencies.";
+// `artistGenre` is the artist's own declared lane. When present it WINS over
+// Essentia's guess, which reads math rather than culture and routinely mislabels
+// culturally-specific music (a Fireboy DML Afrobeats track is stored as
+// "hip-hop"). Only the Lineage wording changes — every numeric feature still
+// drives the Visual DNA exactly as before.
+const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
+  if (!features) {
+    return artistGenre
+      ? `Lineage: ${artistGenre}. Audio structural variables aligned to standard baseline frequencies.`
+      : "Audio structural variables aligned to standard baseline frequencies.";
+  }
   const { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood, genre } = features;
   const parts = [];
 
-  parts.push(`Lineage: ${genre || 'Contemporary Sound'}`);
+  parts.push(`Lineage: ${artistGenre || genre || 'Contemporary Sound'}`);
   parts.push(`Tempo/Key: ${bpm || 90} BPM in ${key || 'C'} ${scale || 'Major'}`);
   parts.push(`Energy Density: ${energy || 50}/100, Valence/Emotional Weight: ${valence || 50}/100`);
   parts.push(`Rhythm Matrix: Danceability ${danceability || 50}/100, Acousticness ${acousticness || 50}/100`);
@@ -369,17 +383,31 @@ ARTIST'S OWN DESCRIPTION: "${userVibeInput.trim()}"`
   }
 }
 
-// Fetches the artist's brand attributes (city, signature sound words) so every
-// scene-generation call — not just the POST / last-resort fallback — carries
-// the same brand context that shaped the well-performing test generations.
-async function fetchArtistContext(userId) {
+const EMPTY_ARTIST_PROFILE = { contextLine: '', genreLineage: null, subjectRule: '' }
+
+// Fetches the artist's declared profile so every scene-generation call carries
+// their brand context AND the two choices that steer the pipeline:
+//   - genreLineage: their declared lane. Essentia reads math, not culture, and
+//     mislabels culturally-specific music (an Afrobeats track lands as
+//     "hip-hop"), so the artist's tag overrides it for `Lineage:` in the scene
+//     prompt. Essentia's numbers still drive the Visual DNA untouched.
+//   - subjectRule: a hard constraint on whether a person may appear at all.
+async function fetchArtistProfile(userId) {
   try {
-    const { data } = await supabase.from('users').select('city, sound_words').eq('id', userId).single()
-    if (!data) return ''
-    return `Origin: ${data.city || 'Unknown Space'}. Signature Sound Identity: ${data.sound_words || 'Chill, Vibe, Cool'}.`
+    const { data } = await supabase
+      .from('users')
+      .select('city, sound_words, default_genre, default_subject_mode')
+      .eq('id', userId)
+      .single()
+    if (!data) return EMPTY_ARTIST_PROFILE
+    return {
+      contextLine: `Origin: ${data.city || 'Unknown Space'}. Signature Sound Identity: ${data.sound_words || 'Chill, Vibe, Cool'}.`,
+      genreLineage: genreLineage(data.default_genre),
+      subjectRule: subjectModeRule(data.default_subject_mode),
+    }
   } catch (err) {
     console.warn(`[ARTIST CONTEXT] Fetch failed, continuing without brand context: ${err?.message || err}`)
-    return ''
+    return EMPTY_ARTIST_PROFILE
   }
 }
 
@@ -409,14 +437,14 @@ router.post('/expand', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Upload record not found' });
     }
 
-    const audioContext = audioFeaturesToVisualDescription(upload.audio_features);
-    const artistContext = await fetchArtistContext(userId);
+    const artist = await fetchArtistProfile(userId);
+    const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
 
     const promptText = `${AESTHETIC_SYSTEM_PROMPT}
-
+${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 Artist input text: "${basic_input.trim()}"
 Audio context variables: ${audioContext}
-${artistContext ? `Artist Branding Space Context: ${artistContext}` : ''}`;
+${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
 
     let technique, scene
     try {
@@ -467,7 +495,10 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     }
 
     const userVibeInput = upload.sentence_prompt || 'Abstract intense emotion'
-    const trackSonicFeatures = audioFeaturesToVisualDescription(upload.audio_features)
+    // Fetched up front so the artist's declared genre can correct Essentia's
+    // guess before the sonic profile string is built.
+    const artist = await fetchArtistProfile(userId)
+    const trackSonicFeatures = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage)
 
     let lyricsText = ''
     let source = 'none'
@@ -558,15 +589,14 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     // scene prompt directly (literal narrative bias → risky/awkward renders), but
     // the concrete brief keeps the cover recognisably about this specific song.
     const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
-    const artistContext = await fetchArtistContext(userId)
 
     const promptText = `${AESTHETIC_SYSTEM_PROMPT}
-
+${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
 2. What This Song Is About (concrete brief distilled from the lyrics — stage THIS): "${distilledTheme}"
 3. Track Sonic Profile Features: ${trackSonicFeatures}
-${artistContext ? `4. Artist Branding Space Context: ${artistContext}` : ''}`;
+${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}` : ''}`;
 
     let technique, scene
     try {
@@ -627,7 +657,7 @@ router.post('/', requireAuth, async (req, res) => {
         .single(),
       supabase
         .from('users')
-        .select('city, sound_words')
+        .select('city, sound_words, default_genre, default_subject_mode')
         .eq('id', userId)
         .single(),
     ])
@@ -638,12 +668,16 @@ router.post('/', requireAuth, async (req, res) => {
 
     const upload = uploadResult.data
     const artistProfile = profileResult.data || {}
+    const artistNoPeople = artistProfile.default_subject_mode === 'no_people'
 
     if (upload.status === 'uploaded') {
       return res.status(409).json({ error: 'Audio analysis must complete before generating art' })
     }
 
-    const trackSonicFeatures = audioFeaturesToVisualDescription(upload.audio_features)
+    const trackSonicFeatures = audioFeaturesToVisualDescription(
+      upload.audio_features,
+      genreLineage(artistProfile.default_genre)
+    )
 
     // Resolve technique + scene from (in priority order): explicit request body
     // override, an already-persisted brief from /transcribe or /expand, or —
@@ -674,6 +708,7 @@ router.post('/', requireAuth, async (req, res) => {
     const { prompt: absoluteFluxPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       useCompiler: req.body.use_compiler === true,
       mood: upload.audio_features?.mood,
+      noPeople: artistNoPeople,
     })
 
     const generationId = crypto.randomUUID()
@@ -789,7 +824,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
         .single(),
       supabase
         .from('users')
-        .select('city, sound_words')
+        .select('city, sound_words, default_genre, default_subject_mode')
         .eq('id', userId)
         .single(),
     ]);
@@ -799,10 +834,16 @@ router.patch('/refine', requireAuth, async (req, res) => {
     }
 
     const upload = uploadResult.data;
-    const trackSonicFeatures = audioFeaturesToVisualDescription(upload.audio_features);
+    const refineProfile = profileResult.data || {};
+    const refineNoPeople = refineProfile.default_subject_mode === 'no_people';
+    const refineSubjectRule = subjectModeRule(refineProfile.default_subject_mode);
+    const trackSonicFeatures = audioFeaturesToVisualDescription(
+      upload.audio_features,
+      genreLineage(refineProfile.default_genre)
+    );
 
     const refinementPrompt = `${AESTHETIC_SYSTEM_PROMPT}
-
+${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
 You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — keep the same technique unless the request clearly demands a different one.
 
 INPUT REFINEMENT VARIABLES:
@@ -826,6 +867,7 @@ INPUT REFINEMENT VARIABLES:
     const { prompt: absoluteFluxRefinedPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       useCompiler: req.body.use_compiler === true,
       mood: upload.audio_features?.mood,
+      noPeople: refineNoPeople,
     });
 
     const generationId = crypto.randomUUID();
