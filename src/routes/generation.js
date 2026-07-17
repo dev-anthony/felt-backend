@@ -43,6 +43,28 @@ async function geminiRawText(promptText, { temperature = 0.85 } = {}) {
   })
   return response.text?.trim() || ''
 }
+// Recovers { technique, scene } from a stored sentence_prompt value. `structured`
+// tells the caller whether this came from real JSON (a finished /expand or
+// /transcribe brief) or was a raw, unexpanded string that just happens to be
+// non-empty — so a caller can choose NOT to treat raw text as a literal scene.
+function deserializeBrief(stored) {
+  if (!stored) return null
+  try {
+    const parsed = JSON.parse(stored)
+    if (parsed && typeof parsed.scene === 'string') {
+      return {
+        technique: TECHNIQUE_SUFFIXES[parsed.technique] ? parsed.technique : DEFAULT_TECHNIQUE,
+        scene: parsed.scene,
+        structured: true,
+      }
+    }
+  } catch {
+    // Not JSON — raw, unexpanded input left in this column (e.g. a beat
+    // generated before the /expand persistence fix, or any other path that
+    // never ran it through AESTHETIC_SYSTEM_PROMPT).
+  }
+  return { technique: DEFAULT_TECHNIQUE, scene: stored, structured: false }
+}
 
 // LAYER 1: FELT — Unified High-Concept Technique-Matched Prompt
 const AESTHETIC_SYSTEM_PROMPT = `You are a synesthetic visual artist and an elite music cover art director working for real recording artists.
@@ -417,6 +439,58 @@ async function fetchArtistProfile(userId) {
  * POST /api/generations/expand
  * Manual blueprint expansion handler
  */
+// router.post('/expand', requireAuth, async (req, res) => {
+//   const { upload_id, basic_input } = req.body;
+//   const userId = req.user.id;
+
+//   if (!upload_id || !basic_input?.trim()) {
+//     return res.status(400).json({ error: 'upload_id and basic_input are required' });
+//   }
+
+//   try {
+//     const { data: upload, error: uploadError } = await supabase
+//       .from('uploads')
+//       .select('id, audio_features')
+//       .eq('id', upload_id)
+//       .eq('user_id', userId)
+//       .single();
+
+//     if (uploadError || !upload) {
+//       return res.status(404).json({ error: 'Upload record not found' });
+//     }
+
+//     const artist = await fetchArtistProfile(userId);
+//     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
+
+//     const promptText = `${AESTHETIC_SYSTEM_PROMPT}
+// ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
+// Artist input text: "${basic_input.trim()}"
+// Audio context variables: ${audioContext}
+// ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
+
+//     let technique, scene
+//     try {
+//       ({ technique, scene } = await generateSafeScene(promptText, {
+//         temperature: 0.75,
+//         fallbackScene: basic_input.trim(),
+//       }))
+//     } catch (gErr) {
+//       console.error(`[EXPAND ENGINE] Gemini fault after retries: ${gErr?.message || gErr}`)
+//       technique = DEFAULT_TECHNIQUE
+//       scene = basic_input.trim()
+//     }
+
+//     return res.status(200).json({
+//       original: basic_input.trim(),
+//       expanded: scene,
+//       technique,
+//     });
+
+//   } catch (err) {
+//     console.error('[EXPAND ENGINE] FAULT:', err?.message || err);
+//     return res.status(500).json({ error: 'Internal processing loop failure.' });
+//   }
+// });
 router.post('/expand', requireAuth, async (req, res) => {
   const { upload_id, basic_input } = req.body;
   const userId = req.user.id;
@@ -457,6 +531,16 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       technique = DEFAULT_TECHNIQUE
       scene = basic_input.trim()
     }
+
+    // Persist technique + scene together, same as /transcribe — otherwise
+    // sentence_prompt stays the raw one-liner the artist typed, and /generate's
+    // deserializeBrief later fails to parse it as JSON, silently falling back to
+    // using that raw, unexpanded phrase as the literal final scene (skipping
+    // every subject/location/action rule in AESTHETIC_SYSTEM_PROMPT entirely).
+    await supabase
+      .from('uploads')
+      .update({ sentence_prompt: serializeBrief(technique, scene) })
+      .eq('id', upload_id)
 
     return res.status(200).json({
       original: basic_input.trim(),
@@ -639,6 +723,139 @@ ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}`
  * POST /api/generations
  * CORE UNIFIED ENGINE: Technique-matched prompt guarantees a photographic, non-generic look
  */
+// router.post('/', requireAuth, async (req, res) => {
+//   const { upload_id, lyric_context, technique: techniqueOverride } = req.body
+//   const userId = req.user.id
+
+//   if (!upload_id) {
+//     return res.status(400).json({ error: 'upload_id is required' })
+//   }
+
+//   try {
+//     const [uploadResult, profileResult] = await Promise.all([
+//       supabase
+//         .from('uploads')
+//         .select('id, title, track_type, audio_features, sentence_prompt, status')
+//         .eq('id', upload_id)
+//         .eq('user_id', userId)
+//         .single(),
+//       supabase
+//         .from('users')
+//         .select('city, sound_words, default_genre, default_subject_mode')
+//         .eq('id', userId)
+//         .single(),
+//     ])
+
+//     if (uploadResult.error || !uploadResult.data) {
+//       return res.status(404).json({ error: 'Upload asset record not found' })
+//     }
+
+//     const upload = uploadResult.data
+//     const artistProfile = profileResult.data || {}
+//     const artistNoPeople = artistProfile.default_subject_mode === 'no_people'
+
+//     if (upload.status === 'uploaded') {
+//       return res.status(409).json({ error: 'Audio analysis must complete before generating art' })
+//     }
+
+//     const trackSonicFeatures = audioFeaturesToVisualDescription(
+//       upload.audio_features,
+//       genreLineage(artistProfile.default_genre)
+//     )
+
+//     // Resolve technique + scene from (in priority order): explicit request body
+//     // override, an already-persisted brief from /transcribe or /expand, or —
+//     // only as a last resort — a fresh synthesis call.
+//     let technique, scene
+
+//     if (lyric_context) {
+//       technique = TECHNIQUE_SUFFIXES[techniqueOverride] ? techniqueOverride : DEFAULT_TECHNIQUE
+//       scene = lyric_context.trim()
+//     } else {
+//       const storedBrief = deserializeBrief(upload.sentence_prompt)
+//       if (storedBrief) {
+//         ;({ technique, scene } = storedBrief)
+//       } else {
+//         ;({ technique, scene } = await synthesizeSceneBrief({
+//           userInput: 'Abstract intense emotion',
+//           lyrics: '',
+//           sonicFeatures: trackSonicFeatures,
+//           artistContext: `${artistProfile.city || 'Unknown Space'} (${artistProfile.sound_words || 'Raw Collective'})`,
+//         }))
+//       }
+//     }
+
+//     // Route through the Visual Operating System: Visual DNA (deterministic from
+//     // audio_features) + Prompt Assembler. Pass use_compiler: true in the request
+//     // body to additionally run the Gemini Prompt Compiler for a DNA-constrained
+//     // structured scene.
+//     const { prompt: absoluteFluxPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+//       useCompiler: req.body.use_compiler === true,
+//       mood: upload.audio_features?.mood,
+//       noPeople: artistNoPeople,
+//     })
+
+//     const generationId = crypto.randomUUID()
+//     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id)
+
+//     console.log(`[IMAGE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline for ID: ${generationId} technique=${technique}`)
+
+//     let imagePayloadUrl
+//     try {
+//       imagePayloadUrl = await generateImage(absoluteFluxPrompt, { width: 1024, height: 1024 })
+//     } catch (hfErr) {
+//       const detail = hfErr?.message || String(hfErr)
+//       console.error('[HF GENERATION EXCEPTION MATRIX CRASH]:', detail)
+//       await supabase.from('uploads').update({ status: 'analyzed' }).eq('id', upload_id)
+//       // Surface quota/credit exhaustion distinctly so the UI can tell the user
+//       // to top up credits rather than showing a generic "try again" failure.
+//       if (/credit|quota|depleted|PRO to get|payment required/i.test(detail)) {
+//         return res.status(402).json({ error: 'Image provider credits exhausted.', detail })
+//       }
+//       return res.status(502).json({ error: 'Hugging Face image pipeline failed.', detail })
+//     }
+
+//     let permanentUrl
+//     try {
+//       const result = await cloudinary.uploader.upload(imagePayloadUrl, {
+//         folder: `felt/generations/${upload_id}`,
+//         public_id: `cover_${generationId}`,
+//         overwrite: true,
+//         resource_type: 'image',
+//       })
+//       permanentUrl = result.secure_url
+//     } catch (cloudinaryErr) {
+//       console.warn('[CLOUDINARY UPLOAD FAULT]:', cloudinaryErr?.message || cloudinaryErr)
+//       permanentUrl = imagePayloadUrl
+//     }
+
+//     await supabase
+//       .from('generations')
+//       .insert({
+//         id: generationId,
+//         upload_id,
+//         user_id: userId,
+//         prompt_used: absoluteFluxPrompt,
+//         technique,
+//         image_url: permanentUrl,
+//         status: 'complete',
+//         created_at: new Date().toISOString(),
+//       })
+//       .throwOnError()
+
+//     await supabase.from('uploads').update({ status: 'complete' }).eq('id', upload_id)
+
+//     return res.status(201).json({
+//       generation_id: generationId,
+//       image_url: permanentUrl,
+//       technique,
+//     })
+
+//   } catch (err) {
+//     console.error('❌ [GENERATION PIPELINE FAULT]:', err?.message || err)
+//     return res.status(500).json({ error: err?.message || 'Internal processing route fault.' })
+//   }
+// })
 router.post('/', requireAuth, async (req, res) => {
   const { upload_id, lyric_context, technique: techniqueOverride } = req.body
   const userId = req.user.id
@@ -680,8 +897,14 @@ router.post('/', requireAuth, async (req, res) => {
     )
 
     // Resolve technique + scene from (in priority order): explicit request body
-    // override, an already-persisted brief from /transcribe or /expand, or —
-    // only as a last resort — a fresh synthesis call.
+    // override, an already-persisted STRUCTURED brief from /transcribe or
+    // /expand, or a fresh synthesis call. A stored value that failed to parse as
+    // JSON is raw/unexpanded input, not a director's brief — it must be run
+    // through synthesizeSceneBrief rather than used verbatim as the literal
+    // scene (that was the beat-pipeline bug: a one-line mood phrase like
+    // "Emotional breeze, clear as crystal, peace and calm." got treated as a
+    // finished scene, skipping every subject/location/action rule in
+    // AESTHETIC_SYSTEM_PROMPT entirely).
     let technique, scene
 
     if (lyric_context) {
@@ -689,11 +912,13 @@ router.post('/', requireAuth, async (req, res) => {
       scene = lyric_context.trim()
     } else {
       const storedBrief = deserializeBrief(upload.sentence_prompt)
-      if (storedBrief) {
+      if (storedBrief && storedBrief.structured) {
         ;({ technique, scene } = storedBrief)
       } else {
         ;({ technique, scene } = await synthesizeSceneBrief({
-          userInput: 'Abstract intense emotion',
+          // If there was raw text sitting in sentence_prompt, don't discard it —
+          // feed it in as the artist's own input, same as /expand would have.
+          userInput: storedBrief ? storedBrief.scene : 'Abstract intense emotion',
           lyrics: '',
           sonicFeatures: trackSonicFeatures,
           artistContext: `${artistProfile.city || 'Unknown Space'} (${artistProfile.sound_words || 'Raw Collective'})`,
@@ -723,8 +948,6 @@ router.post('/', requireAuth, async (req, res) => {
       const detail = hfErr?.message || String(hfErr)
       console.error('[HF GENERATION EXCEPTION MATRIX CRASH]:', detail)
       await supabase.from('uploads').update({ status: 'analyzed' }).eq('id', upload_id)
-      // Surface quota/credit exhaustion distinctly so the UI can tell the user
-      // to top up credits rather than showing a generic "try again" failure.
       if (/credit|quota|depleted|PRO to get|payment required/i.test(detail)) {
         return res.status(402).json({ error: 'Image provider credits exhausted.', detail })
       }
