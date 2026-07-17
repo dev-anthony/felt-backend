@@ -10,10 +10,6 @@ const { fetchLyricsOnline } = require('../utils/lyricsFetcher')
 // ─── INSTANTIATE SERVICE CLIENTS ──────────────────────────────────────────────
 const { GoogleGenAI } = require('@google/genai')
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-
-// Image generation is provider-agnostic (see utils/imageProvider). Defaults to
-// the free, no-key Pollinations FLUX backend; switch with IMAGE_PROVIDER env
-// (pollinations | together | huggingface | replicate).
 const { generateImage, DEFAULT_PROVIDER } = require('../utils/imageProvider')
 
 // ─── FELT VISUAL OPERATING SYSTEM ─────────────────────────────────────────────
@@ -278,24 +274,7 @@ function serializeBrief(technique, scene) {
   return JSON.stringify({ technique, scene })
 }
 
-// Recovers { technique, scene } from a stored sentence_prompt value. Handles
-// legacy plain-string values (pre-technique-library rows) by treating them as
-// a scene with the default technique.
-function deserializeBrief(stored) {
-  if (!stored) return null
-  try {
-    const parsed = JSON.parse(stored)
-    if (parsed && typeof parsed.scene === 'string') {
-      return {
-        technique: TECHNIQUE_SUFFIXES[parsed.technique] ? parsed.technique : DEFAULT_TECHNIQUE,
-        scene: parsed.scene,
-      }
-    }
-  } catch {
-    // Not JSON — legacy plain-string brief from before this change
-  }
-  return { technique: DEFAULT_TECHNIQUE, scene: stored }
-}
+
 
 // `artistGenre` is the artist's own declared lane. When present it WINS over
 // Essentia's guess, which reads math rather than culture and routinely mislabels
@@ -435,62 +414,7 @@ async function fetchArtistProfile(userId) {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
-/**
- * POST /api/generations/expand
- * Manual blueprint expansion handler
- */
-// router.post('/expand', requireAuth, async (req, res) => {
-//   const { upload_id, basic_input } = req.body;
-//   const userId = req.user.id;
 
-//   if (!upload_id || !basic_input?.trim()) {
-//     return res.status(400).json({ error: 'upload_id and basic_input are required' });
-//   }
-
-//   try {
-//     const { data: upload, error: uploadError } = await supabase
-//       .from('uploads')
-//       .select('id, audio_features')
-//       .eq('id', upload_id)
-//       .eq('user_id', userId)
-//       .single();
-
-//     if (uploadError || !upload) {
-//       return res.status(404).json({ error: 'Upload record not found' });
-//     }
-
-//     const artist = await fetchArtistProfile(userId);
-//     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
-
-//     const promptText = `${AESTHETIC_SYSTEM_PROMPT}
-// ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
-// Artist input text: "${basic_input.trim()}"
-// Audio context variables: ${audioContext}
-// ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
-
-//     let technique, scene
-//     try {
-//       ({ technique, scene } = await generateSafeScene(promptText, {
-//         temperature: 0.75,
-//         fallbackScene: basic_input.trim(),
-//       }))
-//     } catch (gErr) {
-//       console.error(`[EXPAND ENGINE] Gemini fault after retries: ${gErr?.message || gErr}`)
-//       technique = DEFAULT_TECHNIQUE
-//       scene = basic_input.trim()
-//     }
-
-//     return res.status(200).json({
-//       original: basic_input.trim(),
-//       expanded: scene,
-//       technique,
-//     });
-
-//   } catch (err) {
-//     console.error('[EXPAND ENGINE] FAULT:', err?.message || err);
-//     return res.status(500).json({ error: 'Internal processing loop failure.' });
-//   }
-// });
 router.post('/expand', requireAuth, async (req, res) => {
   const { upload_id, basic_input } = req.body;
   const userId = req.user.id;
