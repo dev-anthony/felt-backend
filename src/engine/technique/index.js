@@ -30,44 +30,54 @@ const TECHNIQUES = {
   FLASH_DOCUMENTARY: {
     suffix: 'An unstaged frame — the kind a friend takes at 2am, nothing arranged for the camera.',
     dnaBias: { grit: +0.12, energy: +0.08 },
+    graphic: ['graphic_clean_photo', 'graphic_parental_advisory']
   },
   VINTAGE_FILM_NOSTALGIA: {
     suffix: 'A real film photograph that has physically aged, not a digital imitation of film.',
     dnaBias: { warmth: +0.12, acousticness: +0.08 },
+    graphic: ['graphic_clean_photo', 'graphic_vinyl_sleeve']
   },
   SILHOUETTE_ATMOSPHERE: {
     suffix: 'The light source, not the face, is the subject of the photograph.',
     dnaBias: { darkness: +0.12, intimacy: +0.05 },
+    graphic: ['graphic_clean_photo']
   },
   SURREAL_PRACTICAL_METAPHOR: {
     suffix: 'The impossible element is a real prop, physically built and shot in camera.',
     dnaBias: { darkness: +0.08, aggression: +0.06 },
+    graphic: ['graphic_clean_photo']
   },
   DUOTONE_COLOR_WASH: {
     suffix: 'The colour lives in the emulsion of a real print, not a flat digital filter laid on top.',
     dnaBias: { darkness: +0.10, intimacy: +0.06 },
+    graphic: ['graphic_clean_photo']
   },
   MACRO_INTIMATE_DETAIL: {
     suffix: 'Uncomfortably close and completely unretouched.',
     dnaBias: { intimacy: +0.15 },
+    graphic: ['graphic_clean_photo']
   },
   MOTION_BLUR_STROBE: {
     suffix: 'The blur is a real long-exposure artifact of the moment, not an added effect.',
     dnaBias: { motion: +0.15, danceability: +0.06 },
+    graphic: ['graphic_clean_photo']
   },
   MIRROR_DOUBLE_EXPOSURE: {
     // No film claim: this technique's stock is film_digital_clean (the only
     // palette-neutral option, needed to keep its cobalt duotone coherent).
     suffix: 'Both layers are one single in-camera exposure, not two images blended afterward.',
     dnaBias: { darkness: +0.06, intimacy: +0.06 },
+    graphic: ['graphic_clean_photo']
   },
   STUDIO_SEAMLESS_EDITORIAL: {
     suffix: 'A real physical studio shoot, nothing retouched afterward.',
     dnaBias: { euphoria: +0.08, brightness: +0.06 },
+    graphic: ['graphic_clean_photo', 'graphic_minimal_luxury']
   },
   MONUMENTAL_SCALE_ISOLATION: {
     suffix: 'Real atmospheric haze separates the layers of distance.',
     dnaBias: { darkness: +0.06, intimacy: +0.04, energy: -0.06 },
+    graphic: ['graphic_clean_photo', 'graphic_minimal_luxury']
   },
 }
 
