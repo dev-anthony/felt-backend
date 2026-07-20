@@ -22,11 +22,42 @@ const {
 
 const { genreLineage, subjectModeRule } = require('../config/artistProfile')
 
-async function geminiRawText(promptText, { temperature = 0.85 } = {}) {
+// EMOTIONAL INTELLIGENCE LAYER — turns the measured features into an archetype,
+// an aesthetic world and an intensity tier, then hands the scene writer a single
+// clearly-labeled EMOTIONAL REGISTER block. Previously the mood was one clinical
+// line buried among five technical ones, so it steered nothing.
+const { readEmotion, emotionalRegisterBlock } = require('../engine/emotion')
+const { buildFeatureVector } = require('../engine/dna/featureVector')
+
+/** Builds the labeled register block for a track + the artist's own words. */
+function buildEmotionalRegister(features, declaredGenre, intentText) {
+  try {
+    const vector = buildFeatureVector(features)
+    const read = readEmotion(vector, declaredGenre, intentText)
+    if (read.semanticCorrections.length) {
+      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic} | corrections: ${read.semanticCorrections.join('; ')}`)
+    } else {
+      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}`)
+    }
+    return emotionalRegisterBlock(read, read.correctedVector)
+  } catch (err) {
+    console.warn(`[EMOTION] read failed, continuing without register: ${err?.message || err}`)
+    return ''
+  }
+}
+
+// Text model for scene writing. Note: there is no plain `gemini-3.1-flash` text
+// model published on the API — the 3.1 flash family is image/tts/live only — so
+// scene writing stays on 2.5-flash.
+const GEMINI_TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || 'gemini-2.5-flash'
+
+// Temperature is intentionally NOT set on any Gemini call — the model uses its
+// own default sampling. This keeps behaviour consistent and makes it obvious
+// where a bad result actually comes from instead of a hand-tuned temperature.
+async function geminiRawText(promptText) {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: GEMINI_TEXT_MODEL,
     contents: promptText,
-    config: { temperature },
   })
   return response.text?.trim() || ''
 }
@@ -48,101 +79,83 @@ function deserializeBrief(stored) {
   return { technique: DEFAULT_TECHNIQUE, scene: stored, structured: false }
 }
 
-const AESTHETIC_SYSTEM_PROMPT = `You are a synesthetic visual artist and an elite music cover art director working for real recording artists.
-Every cover you direct must look like an actual photograph that was shot with a camera, then hand-graded — never a smooth, symmetrical, AI-diffusion look.
+const AESTHETIC_SYSTEM_PROMPT = `You are the art director for a real recording artist's single cover. You write ONE photographic moment. You do not write poetry, mood boards, or explanations.
 
-You do not interpret text literally. You translate the underlying feeling, sonic attributes, and lyrics into ONE specific, nameable photographic technique — not a vague mood board.
+Everything you write must serve one goal: someone who has heard this song should look at the cover and recognise it. Not "a nice image" — THIS song's image.
 
-Every image is a definitive 1:1 edge-to-edge square cover for streaming platforms. Never render physical canvases, frames, borders, hanging art, or gallery walls.
+An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. It is the single most important input you receive. Read it first and let it govern the entire frame — the register, the aesthetic world, the intensity tier, and above all the MOVEMENT line.
 
-TECHNIQUE LIBRARY — choose exactly ONE per brief, matched to the emotional energy:
+TECHNIQUE LIBRARY — choose exactly ONE, matched to the emotional register:
 
-1. FLASH_DOCUMENTARY (for defiance, chaotic joy, party energy, raw confessional honesty)
-   - Direct on-camera flash, slightly overexposed skin highlights, a hard graphic shadow cast behind the subject onto the wall/floor.
-   - Candid, unposed body language; cluttered real-world props scattered at floor level (magazines, drinks, ashtrays, worn furniture).
-   - Feels like a photo someone's friend took at 2am, not a studio shoot.
-
-2. VINTAGE_FILM_NOSTALGIA (for nostalgia, cruising, comfort, warm memory, retro pride)
-   - Visible 35mm film grain, warm halation bleeding around bright highlights, slightly faded/lifted blacks.
-   - Analog-era props: car interiors, cassette tapes, vinyl records, disposable-camera color cast.
-   - Color grade leans warm amber/orange or muted sun-bleached tone.
-
-3. SILHOUETTE_ATMOSPHERE (for isolation, grandeur, spiritual searching, quiet strength)
-   - Subject is rim-lit or entirely silhouetted against a dominant atmospheric element: smoke, fog, haze, or a glittering night skyline.
-   - Face and body mostly fall into shadow; the light source (not the subject) is the visual anchor.
-   - Deep, almost-black shadow detail; the subject reads as a shape before a person.
-
-4. SURREAL_PRACTICAL_METAPHOR (for internal conflict, pain, addiction, existential crisis)
-   - One literal physical object interacts with the body as if it were really staged and shot in-camera (arrows through a torso, a page on fire while being read, a limb bound or restrained).
-   - Must look like practical effects photography — real physical weight, correct shadows cast by the object onto skin/clothing — never a floating CGI overlay.
-
-5. DUOTONE_COLOR_WASH (for obsession, melancholy, night driving, longing)
-   - The entire frame is pushed to a single dominant hue (deep cobalt blue, blood red, sepia) as if shot under one gel or printed with a color filter.
-   - Film grain and texture remain visible underneath the color wash — this is a color cast, not a flat digital tint.
-
-6. MACRO_INTIMATE_DETAIL (for vulnerability, sensuality, tenderness, longing)
-   - Extreme close crop on one feature — lips, eyes, a hand touching skin — shallow depth of field with soft falloff.
-   - Skin must show real pores, texture, and moisture/gloss where relevant; no airbrushing.
-
-7. MOTION_BLUR_STROBE (for anxiety, mania, spiraling thoughts, disorientation)
-   - Slow shutter speed creates directional blur trails across the subject, frozen at one sharp instant by a strobe/flash pop.
-   - The blur should look like a real long exposure artifact, not a digital "speed lines" effect.
-
-8. MIRROR_DOUBLE_EXPOSURE (for duality, identity conflict, self-confrontation)
-   - A reflected or overlaid duplicate of the subject, mirrored across a literal surface (water, glass) or layered as an in-camera double exposure.
-   - The two layers should have a slight misalignment or ghosting, like a real double-exposed frame, not a perfect digital mirror.
-
-9. STUDIO_SEAMLESS_EDITORIAL (for confidence, boldness, a single strong emotional color)
-   - Subject against a saturated solid-color seamless paper backdrop, lit with direct flash or hard strip light.
-   - Editorial energy, but grain and skin texture stay real and gritty — never glossy catalog-smooth.
-
-10. MONUMENTAL_SCALE_ISOLATION (for loneliness, absence, memory, freedom, small-against-the-world feelings)
-   - One massive, dominant single element (an oversized sun or moon, a towering wall, a vast flat horizon, an enormous cloud bank) swallows most of the frame.
-   - The human subject, if present at all, is small, often fully silhouetted, and pushed to one edge or the bottom of the frame — the scale imbalance IS the emotional content.
-   - Backgrounds can be a single flat color field (a wall, a sky) with no other detail competing for attention. This technique can also render with NO human figure at all — an empty landscape, a parked car, a single object — if the brief is about absence, memory, or isolation rather than a person's presence.
+1. FLASH_DOCUMENTARY — defiance, chaotic joy, party energy, raw confession. Unstaged, candid, 2am.
+2. VINTAGE_FILM_NOSTALGIA — nostalgia, cruising, comfort, warm memory, retro pride.
+3. SILHOUETTE_ATMOSPHERE — isolation, grandeur, spiritual searching. The light source, not the face, is the subject.
+4. SURREAL_PRACTICAL_METAPHOR — internal conflict, pain, addiction, existential weight. One real physical object staged against the body.
+5. DUOTONE_COLOR_WASH — obsession, melancholy, night driving, longing. One dominant hue through the whole frame.
+6. MACRO_INTIMATE_DETAIL — vulnerability, sensuality, tenderness. One feature filling the frame.
+7. MOTION_BLUR_STROBE — dancing, mania, spiralling thought, physical release. Real long-exposure blur.
+8. MIRROR_DOUBLE_EXPOSURE — duality, identity conflict, self-confrontation.
+9. STUDIO_SEAMLESS_EDITORIAL — confidence, boldness, one strong emotional colour.
+10. MONUMENTAL_SCALE_ISOLATION — loneliness, absence, memory, freedom, small-against-the-world.
 
 TECHNIQUE SELECTION (CRITICAL — do NOT default to silhouettes):
-- Choose the technique that genuinely fits the emotion, and VARY it across songs. Do not reach for SILHOUETTE_ATMOSPHERE by habit.
-- SILHOUETTE_ATMOSPHERE and MONUMENTAL_SCALE_ISOLATION HIDE the subject's face and identity — a silhouette has no personality. Use them ONLY when the song is truly about isolation, anonymity, grandeur, absence or memory. They are the exception, not the default.
-- Most covers should REVEAL the subject's face and identity. For moody, intimate, romantic, confident, nostalgic or energetic songs prefer an identity-showing technique: DUOTONE_COLOR_WASH, MACRO_INTIMATE_DETAIL, VINTAGE_FILM_NOSTALGIA, STUDIO_SEAMLESS_EDITORIAL, FLASH_DOCUMENTARY, MOTION_BLUR_STROBE, MIRROR_DOUBLE_EXPOSURE or SURREAL_PRACTICAL_METAPHOR — a dark, moody mood does NOT require a silhouette.
+- Choose what genuinely fits the register, and VARY it across songs.
+- SILHOUETTE_ATMOSPHERE and MONUMENTAL_SCALE_ISOLATION HIDE the face and identity. Use them ONLY when the song is truly about isolation, anonymity, grandeur or absence. They are the exception.
+- Most covers should REVEAL the face. A dark or moody register does NOT require a silhouette.
+- When the MOVEMENT line reads HIGH, strongly prefer a technique that can carry motion (MOTION_BLUR_STROBE, FLASH_DOCUMENTARY, STUDIO_SEAMLESS_EDITORIAL). Never answer a high-movement track with a still, contemplative frame.
 
-RELEVANCE MANDATE (CRITICAL — this is the entire job):
-- The scene MUST be visibly, specifically about what THIS song is about. Read the artist's feeling and the distilled theme, then stage the actual situation, place, person, or emotional moment they describe.
-- Never fall back on a generic default (a lone figure in a dim room, someone staring out a rain-streaked window) unless the theme is literally that. A song about a hometown shows that place; a song about money and pressure shows that world; a song about a breakup shows a specific charged moment or the object left behind.
-- Pick ONE concrete anchor for the frame: a specific person doing a specific thing, a specific place, or a single loaded object. It should read like a still lifted from this exact song's world — someone who knows the song should recognise it.
+RELEVANCE MANDATE (this is the entire job):
+- The scene MUST be visibly, specifically about what THIS song is about. Stage the actual situation, place, person or moment the artist and the lyrics describe.
+- Never fall back on a generic default (a lone figure in a dim room, someone staring out a rain-streaked window) unless the theme is literally that.
+- Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object.
 
-STORY-ONLY RULE (CRITICAL):
-- You write the STORY, never the photography. Describe ONLY: who or what is in frame, where they are, what they are physically doing, their expression/posture, and at most ONE physical symbolic object.
-- Do NOT mention any camera, lens, film stock, lighting, shadows, rim light, color grade, hue, grain, exposure, vignette, or post-processing. A separate system already decides every one of those, and naming them here corrupts the result. Simply describe the world and the moment, the way you'd tell a friend what is happening in the photo.
-- Keep it concrete and physical — real places, real objects, real body language. Describe OBSERVABLE REALITY, not emotional abstractions. BANNED mood words: "dark", "moody", "mysterious", "atmospheric", "lonely", "ethereal", "melancholic atmosphere", "meditative energy" — instead describe the physical thing that creates that feeling (e.g. "a single streetlamp behind her as the block empties out" rather than "lonely and mysterious").
+DEPICTING CONNECTION, CHEMISTRY & DESIRE (CRITICAL — read carefully):
+Songs about attraction, chemistry, dancing with someone, or being wanted are extremely common, and there is a failure mode you must avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
+Instead, convey connection through ENERGY, MOTION and IMPLICATION:
+- The subject caught mid-dance — weight shifted, hips turned, hair and fabric still moving, feet off the beat.
+- An action that only makes sense because someone else is there: reaching toward the edge of frame, glancing back over a shoulder, laughing at something off-camera, pulling someone's hand that is just out of shot.
+- A charged environment that holds another presence: two shadows cast by one light, a second drink on the table, a crowd blurred close around them, a hand entering the frame's edge.
+- Heat in the room: sweat catching light, a packed floor, condensation, smoke, bodies implied at the frame's border.
+Any of these beats a static portrait. Choose energy over stillness whenever the register allows it.
 
-SUBJECT CONSTRUCTION (CRITICAL — choose WHO fits the song, and make them MEMORABLE):
-- First DECIDE WHO belongs on this cover — never default to a young woman. Read the genre, mood, lyrics and feeling, then choose the gender, an age that actually fits the song (a child, a teenager, someone in their 20s-40s, an elder — whatever the music implies), body type, and a cultural context that matches the sound. Men, women, children, older people and unconventional-looking people all belong here. Vary this every time based on the track.
-- ANATOMY ANCHORS: state their build and one or two bone-structure facts so the figure has real mass — e.g. "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks", "long angular jaw". Never "a figure".
-- SKIN BIOLOGY (pick specifics from a real spectrum, matched to the person you chose): a base tone (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian, and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles across the nose, visible pores, sun-weathered lines, a healed scar, moles). Skin tone must fit the character and culture — do not always pick the same one.
-- Make them MEMORABLE with ONE or TWO distinctive markers so they look like SOMEBODY, not a stock model — a fade with shaved lines, box braids, locs, a durag, a shaved head, grey hair, a gap or gold tooth, a nose ring, a face/hand tattoo, expressive makeup, cultural jewelry, a signature hat.
-- WARDROBE WITH WEIGHT (anti-shapeless): name specific garments AND how the fabric behaves on the body under gravity — its cut, stiffness and drape. Not "a red dress" but "a heavy structured wool coat cinched at the waist, the fabric pooling over the hips"; not "streetwear" but "an oversized drop-shoulder heavy cotton hoodie stacking sharply at the wrists". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
-- Keep the PERSON to a few vivid concrete facts (who + anatomy + skin + one marker + wardrobe-with-drape + a real expression). Do NOT list every feature — leave room for the world and the action below.
-- BANNED vague words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish". Replace each with concrete physical/structural detail.
-- The subject's face is LIT and clearly visible — write it that way. Never describe the face as shadowed, hidden, obscured, silhouetted or turned fully away UNLESS the chosen technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION. The person is the focal point; the background never outshines them.
+BANNED POSES — these have become defaults and are now forbidden unless the brief explicitly demands them:
+- a hand resting on one's own collarbone, neck or chest
+- eyes closed in serene stillness
+- chin lifted, contemplative, gazing up or into middle distance
+- standing motionless facing the camera with arms at sides
+If your instinct produces one of these, discard it and write an action instead.
 
-ENVIRONMENT & MOMENT (CRITICAL — a cover is a PLACE and a MOMENT, not a floating portrait):
-- Set the scene in ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor." E.g. a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals on wooden tables, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party. Give the place genuine presence in the frame.
-- Add ONE or TWO intentional props that tell the story (a half-finished cocktail, a disco ball's scattered light, a velvet couch, a vintage microphone, drifting smoke, a cracked phone) — chosen for meaning, not clutter.
-- Describe a MOMENT OF ACTION, not a static beauty pose. Say what is HAPPENING: caught mid-step, glancing back over a shoulder, laughing, adjusting a chain, leaning off a wall, stepping through smoke. Avoid the AI-default "chin up, eyes closed, hand on chest."
-- If the song is about movement, dancing, or energy, the body MUST read as in motion — mid-sway, weight shifting, hair or fabric moving — not frozen and still.
-- BALANCE the scene: give the location, the action and the atmosphere at least as much attention as the person. Do not spend the whole scene listing appearance.
+SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
+- DECIDE WHO belongs here — never default to a young woman. From the genre, register and lyrics choose gender, an age that fits (a child, a teenager, someone in their 20s-40s, an elder), build and cultural context. Men, women, children, elders and unconventional-looking people all belong. Vary this every time.
+- ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
+- SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
+- ONE or TWO distinctive markers so they look like SOMEBODY: a lined fade, box braids, locs, a durag, grey hair, a gap or gold tooth, a nose ring, a face or hand tattoo, expressive makeup, cultural jewellery, a signature hat.
+- WARDROBE WITH WEIGHT: name the garment AND how the fabric behaves under gravity — "a heavy structured wool coat cinched at the waist, pooling over the hips", not "a red dress"; "an oversized drop-shoulder hoodie stacking sharply at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
+- Keep the person to a few vivid concrete facts. Do not list every feature — leave room for the world and the action.
+- BANNED words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish".
+- The face is LIT and clearly visible. Never describe it as shadowed, hidden, obscured or turned away UNLESS the technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION.
 
-SUBJECT COUNT RULE (CRITICAL):
-- Default to exactly ONE subject in frame. Do not add a second person unless the input is explicitly about a duo, group, or named collaboration.
-- NEVER depict two people embracing, kissing, dancing together or pressed together, or in any romantic/sexual physical contact — regardless of how romantic or sexual the lyrics or vibe are. This is true even when the song is explicitly about sex, romance, or a relationship.
-- When lyrics or input are romantic or sexual, translate that energy through ONE of: a single subject's expression/posture, symbolic objects, environmental heat/atmosphere, or distance/isolation — never through two bodies touching. A song about desire becomes a single figure with an unreadable expression, not two people together.
-- Two-person compositions are the single most common way this system produces a generic, risky, or stock-photo result. Treat "add a second person" as something that requires explicit justification from the input.
+ENVIRONMENT & MOMENT (a cover is a PLACE and a MOMENT, not a floating portrait):
+- ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor". Name it: a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party.
+- ONE or TWO intentional props that tell the story: a half-finished cocktail, a disco ball's scattered light, a velvet couch, a vintage microphone, drifting smoke, a cracked phone.
+- Describe a MOMENT OF ACTION — what is HAPPENING. Caught mid-step, glancing back, laughing, adjusting a chain, leaning off a wall, stepping through smoke.
+- Match the AESTHETIC WORLD from the register block: Normal = grounded real places and natural materials; Luxury = premium materials, flawless surfaces, expensive light; Gritty = visible wear, real dirt and sweat, uncorrected light.
+- Match the INTENSITY tier: Low is restrained and quiet; Extra High consumes the frame.
+- BALANCE: give the location, the action and the atmosphere at least as much attention as the person.
+
+SUBJECT COUNT (safety):
+- Default to ONE subject in frame. A second person requires explicit justification from the brief (a duo, a named collaboration).
+- Never depict two people embracing, kissing, or in romantic or sexual physical contact, regardless of how romantic the lyrics are. Use the CONNECTION techniques above instead — motion, implication, a charged environment, a hand at the frame's edge. Those are not consolation prizes; they are the stronger image.
+
+STORY-ONLY RULE:
+- You write the STORY, never the photography. Describe only: who is in frame, where they are, what they are physically doing, their expression and posture, and at most ONE symbolic object.
+- Do NOT mention cameras, lenses, film stock, lighting, shadows, rim light, colour grade, hue, grain, exposure, vignette or post-processing. A separate system decides every one of those; naming them here corrupts the result.
+- Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy".
 
 OUTPUT FORMAT (CRITICAL):
 Respond with exactly two lines, nothing else:
 TECHNIQUE: <one of the 10 technique names above, exact match>
-SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, color or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
+SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
 
 function parseSceneResponse(rawText, fallbackScene) {
   const text = (rawText || '').trim()
@@ -201,7 +214,7 @@ async function generateSafeScene(promptText, options) {
   if (sceneFailsSafetyCheck(scene)) {
     console.warn('[SAFETY] Rejected scene brief on first pass — retrying with stricter constraints')
     const stricterPrompt = `${promptText}\n\nSTRICT REQUIREMENT: All subjects must be fully clothed in tasteful, modern styling. No exceptions, no nudity, no undergarments as outerwear, no suggestive framing.`
-    ;({ technique, scene } = await generateWithRetry(stricterPrompt, { ...options, temperature: Math.min(options.temperature ?? 0.8, 0.4) }))
+    ;({ technique, scene } = await generateWithRetry(stricterPrompt, { ...options }))
 
     if (sceneFailsSafetyCheck(scene)) {
       console.warn('[SAFETY] Rejected scene brief on second pass — falling back to hardcoded safe scene')
@@ -236,14 +249,13 @@ const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
   return parts.join('. ');
 };
 
-async function generateWithRetry(promptText, { temperature = 0.8, maxRetries = 3, fallbackScene = '' } = {}) {
+async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '' } = {}) {
   let lastErr
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: GEMINI_TEXT_MODEL,
         contents: promptText,
-        config: { temperature },
       })
       return parseSceneResponse(response.text, fallbackScene)
     } catch (err) {
@@ -261,6 +273,9 @@ async function generateWithRetry(promptText, { temperature = 0.8, maxRetries = 3
 async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext }) {
   const promptText = `${AESTHETIC_SYSTEM_PROMPT}
 
+${emotionalRegister2 ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister2}
+` : ''}
 INPUT MATRIX TO CONVERT:
 1. Artist's Core Feeling / What The Song Is About: "${userInput.trim()}"
 2. Song Lyrics: "${lyrics || 'No lyrics available — treat as instrumental-leaning emotional content'}"
@@ -268,7 +283,7 @@ INPUT MATRIX TO CONVERT:
 ${artistContext ? `4. Artist Branding Space Context: ${artistContext}` : ''}`;
 
   try {
-    return await generateSafeScene(promptText, { temperature: 0.8, fallbackScene: userInput.trim() })
+    return await generateSafeScene(promptText, { fallbackScene: userInput.trim() })
   } catch (err) {
     console.error(`⚠️ Scene brief synthesis fallback triggered: ${err?.message || err}`)
     return { technique: DEFAULT_TECHNIQUE, scene: userInput.trim() }
@@ -297,9 +312,8 @@ ARTIST'S OWN DESCRIPTION: "${userVibeInput.trim()}"`
 
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_TEXT_MODEL,
       contents: distillPrompt,
-      config: { temperature: 0.6 },
     })
     return response.text?.trim() || userVibeInput.trim()
   } catch (err) {
@@ -354,8 +368,13 @@ router.post('/expand', requireAuth, async (req, res) => {
     const artist = await fetchArtistProfile(userId);
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
 
+    const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input)
+
     const promptText = `${AESTHETIC_SYSTEM_PROMPT}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
+${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister}
+` : ''}
 Artist input text: "${basic_input.trim()}"
 Audio context variables: ${audioContext}
 ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
@@ -363,7 +382,6 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
     let technique, scene
     try {
       ({ technique, scene } = await generateSafeScene(promptText, {
-        temperature: 0.75,
         fallbackScene: basic_input.trim(),
       }))
     } catch (gErr) {
@@ -456,15 +474,35 @@ router.post('/transcribe', requireAuth, async (req, res) => {
         console.log(`[DEEPGRAM REQUEST] upload=${upload_id} ext=${extLabel} bytes=${buffer.length}`)
 
         try {
-          const dgResponse = await deepgram.listen.v1.media.transcribeFile(
-            buffer,
-            {
-              model: 'nova-3',
-              smart_format: true,
-              punctuate: true,
-              timeoutInSeconds: 300,
+          // WHY THIS OFTEN RETURNED NOTHING:
+          // nova-3 with no `language` set defaults to English-only. A huge share
+          // of what FELT processes is not monolingual English — Afrobeats and
+          // Amapiano code-switch constantly between English, Pidgin, Yoruba, Igbo,
+          // Twi, Zulu (Fireboy DML's "Vibration" is English + Yoruba + Pidgin).
+          // An English-only decoder scores those as noise and returns an empty
+          // transcript, which looked identical to "this track is instrumental".
+          //
+          // Pass 1 uses nova-3's multilingual mode (code-switching within one
+          // track). Pass 2 falls back to automatic language detection. Only after
+          // both come back empty do we treat the track as genuinely instrumental.
+          const dgBaseOptions = { smart_format: true, punctuate: true, timeoutInSeconds: 300 }
+          const dgPasses = [
+            { label: 'nova-3 multilingual', opts: { model: 'nova-3', language: 'multi', ...dgBaseOptions } },
+            { label: 'nova-2 auto-detect', opts: { model: 'nova-2', detect_language: true, ...dgBaseOptions } },
+          ]
+
+          let dgResponse = null
+          for (const pass of dgPasses) {
+            try {
+              dgResponse = await deepgram.listen.v1.media.transcribeFile(buffer, pass.opts)
+              const alt = dgResponse?.results?.channels?.[0]?.alternatives?.[0]
+              const text = alt?.transcript?.trim() || ''
+              console.log(`[DEEPGRAM PASS] upload=${upload_id} pass="${pass.label}" chars=${text.length} confidence=${alt?.confidence ?? 'n/a'} detected=${dgResponse?.results?.channels?.[0]?.detected_language ?? 'n/a'}`)
+              if (text) break
+            } catch (passErr) {
+              console.warn(`[DEEPGRAM PASS FAILED] "${pass.label}": ${passErr?.message || passErr}`)
             }
-          )
+          }
 
           lyricsText = dgResponse?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() || ''
           source = lyricsText ? 'deepgram' : 'none'
@@ -495,8 +533,12 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     if (!lyricsText || !lyricsText.trim()) {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
+      const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput)
       promptText = `${AESTHETIC_SYSTEM_PROMPT}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
+${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister}
+` : ''}
 VOCAL CONTEXT RULE: This song contains VOCALS, not an instrumental track. Fully expand the user prompt below into a beautifully tailored visual representation matching a vocal track presence to avoid generic cover art layouts.
 Artist input text: "${userVibeInput.trim()}"
 Audio context variables: ${trackSonicFeatures}
@@ -505,6 +547,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       console.log(`[TRANSCRIPTION SUCCESS] Lyrics resolved via ${source}. Distilling structure.`);
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
+      const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`)
       promptText = `${AESTHETIC_SYSTEM_PROMPT}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
@@ -517,7 +560,6 @@ ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}`
     let technique, scene
     try {
       ({ technique, scene } = await generateSafeScene(promptText, {
-        temperature: 0.75, // Uses identical temperature configurations from /expand route execution bounds
         fallbackScene: userVibeInput.trim(),
       }))
       console.log(`[SCENE RECONCILIATION] Resolved scene for upload=${upload_id} with technique=${technique}`);
@@ -753,7 +795,6 @@ INPUT REFINEMENT VARIABLES:
     let technique, scene
     try {
       ({ technique, scene } = await generateSafeScene(refinementPrompt, {
-        temperature: 0.8,
         fallbackScene: refineFallback,
       }))
     } catch (gErr) {

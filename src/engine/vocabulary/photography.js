@@ -64,6 +64,21 @@ const LENSES = [
     fragment: '24mm wide lens exaggerating the scale of the environment',
     anchor: { darkness: 0.5, intimacy: 0.35, brightness: 0.45 },
     techniques: ['MONUMENTAL_SCALE_ISOLATION', 'SILHOUETTE_ATMOSPHERE'] },
+  // Added to break up lens monoculture: 50mm and 85mm were each the preferred
+  // optic for five of ten techniques, so covers that were meant to look
+  // different were being shot through the same glass.
+  { id: 'lens_18mm_ultrawide', category: 'lens', tags: ['ultra-wide', 'scale', 'distortion'],
+    fragment: '18mm ultra-wide lens stretching the foreground and dwarfing the subject against the space',
+    anchor: { darkness: 0.5, intimacy: 0.25, energy: 0.4 },
+    techniques: ['MONUMENTAL_SCALE_ISOLATION'] },
+  { id: 'lens_28mm_reportage', category: 'lens', tags: ['wide-normal', 'reportage', 'candid', 'close-in'],
+    fragment: '28mm reportage lens working close in, immersive with a slight edge stretch',
+    anchor: { grit: 0.65, energy: 0.65, motion: 0.55 },
+    techniques: ['FLASH_DOCUMENTARY'] },
+  { id: 'lens_135mm_f2', category: 'lens', tags: ['telephoto', 'compression', 'isolation'],
+    fragment: '135mm f/2 telephoto compressing the background into a soft wash behind the subject',
+    anchor: { intimacy: 0.6, darkness: 0.55, motion: 0.3 },
+    techniques: ['DUOTONE_COLOR_WASH'] },
   { id: 'lens_100mm_macro', category: 'lens', tags: ['macro', 'detail', 'shallow'],
     fragment: '100mm macro lens with razor-thin depth of field and soft falloff',
     anchor: { intimacy: 0.8, acousticness: 0.55, energy: 0.3 },

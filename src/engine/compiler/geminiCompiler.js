@@ -105,14 +105,14 @@ function parseSceneJSON(rawText, fallback = {}) {
 /**
  * Full compile step.
  * @param {object} args
- * @param {(promptText:string, opts?:object)=>Promise<string>} args.generate raw-text Gemini call
+ * @param {(promptText:string)=>Promise<string>} args.generate raw-text Gemini call
  * @returns {Promise<{ blueprint: import('../types').SceneBlueprint, fallback: boolean }>}
  */
 async function compileScene({ generate, technique, dna, userFeeling, lyricsTheme, mood, fallbackScene }) {
   const promptText = buildCompilerPrompt({ technique, dna, userFeeling, lyricsTheme, mood })
   const fallback = fallbackScene ? { sceneAction: fallbackScene, narrative: fallbackScene } : {}
   try {
-    const raw = await generate(promptText, { temperature: 0.85 })
+    const raw = await generate(promptText)
     return parseSceneJSON(raw, fallback)
   } catch (err) {
     console.warn(`[COMPILER] scene compile failed, using fallback: ${err?.message || err}`)

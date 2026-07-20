@@ -14,7 +14,7 @@
  * Node 18+ global fetch is assumed (the project runs Node 22).
  */
 
-const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'pollinations').toLowerCase()
+const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'gemini').toLowerCase()
 
 // Some providers pass the prompt in the URL (Pollinations) and can 414 on very
 // long prompts. The Visual DNA + Reality prompt is intentionally rich (~2k
@@ -114,13 +114,43 @@ async function viaReplicate(prompt, { width, height }) {
   return `data:image/webp;base64,${buffer.toString('base64')}`
 }
 
+let _genai
+async function viaGemini(prompt, { width, height }) {
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not set')
+  if (!_genai) {
+    const { GoogleGenAI } = require('@google/genai')
+    _genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  }
+  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
+  // Gemini image models take the aspect ratio as language, not pixel dimensions.
+  const ratio = width === height ? '1:1 square' : `${width}x${height}`
+  const res = await _genai.models.generateContent({
+    model,
+    contents: `${prompt}\n\nOutput a single ${ratio} photographic image.`,
+  })
+  const parts = res?.candidates?.[0]?.content?.parts || []
+  const img = parts.find((p) => p.inlineData?.data)
+  if (!img) {
+    const txt = parts.map((p) => p.text).filter(Boolean).join(' ').slice(0, 200)
+    throw new Error(`Gemini returned no image${txt ? `: ${txt}` : ''}`)
+  }
+  return `data:${img.inlineData.mimeType || 'image/png'};base64,${img.inlineData.data}`
+}
+
 const PROVIDERS = {
+  gemini: viaGemini,
   pollinations: viaPollinations,
   together: viaTogether,
   huggingface: viaHuggingface,
   hf: viaHuggingface,
   replicate: viaReplicate,
 }
+
+// Providers to fall back to, in order, when the primary fails for a reason that
+// retrying won't fix (exhausted quota / missing billing / missing key).
+const FALLBACK_CHAIN = ['pollinations']
+const isUnrecoverable = (msg) =>
+  /quota|limit: 0|RESOURCE_EXHAUSTED|billing|depleted|not set|permission|401|402|403|429/i.test(msg)
 
 /**
  * @param {string} prompt
@@ -133,7 +163,27 @@ async function generateImage(prompt, opts = {}) {
   if (!fn) throw new Error(`Unknown IMAGE_PROVIDER "${providerName}" (valid: ${Object.keys(PROVIDERS).join(', ')})`)
   const width = opts.width || 1024
   const height = opts.height || 1024
-  return fn(prompt, { width, height, seed: opts.seed })
+  const args = { width, height, seed: opts.seed }
+
+  try {
+    return await fn(prompt, args)
+  } catch (err) {
+    const msg = err?.message || String(err)
+    // Every Gemini image model currently reports `limit: 0` on a free-tier key —
+    // they require billing. Rather than failing every generation, fall through to
+    // a provider that works, and say so loudly in the logs.
+    if (!isUnrecoverable(msg)) throw err
+    for (const alt of FALLBACK_CHAIN) {
+      if (alt === providerName) continue
+      console.warn(`[IMAGE] "${providerName}" unavailable (${msg.slice(0, 120)}) → falling back to "${alt}"`)
+      try {
+        return await PROVIDERS[alt](prompt, args)
+      } catch (altErr) {
+        console.warn(`[IMAGE] fallback "${alt}" also failed: ${altErr?.message || altErr}`)
+      }
+    }
+    throw err
+  }
 }
 
 module.exports = { generateImage, DEFAULT_PROVIDER }

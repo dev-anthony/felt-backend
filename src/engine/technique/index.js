@@ -103,7 +103,7 @@ function techniqueHidesFace(name) {
  */
 const TECHNIQUE_AFFINITY = {
   FLASH_DOCUMENTARY: {
-    camera: ['cam_35mm_point_shoot', 'cam_disposable'], lens: ['lens_35mm_hyperfocal', 'lens_50mm_f14'],
+    camera: ['cam_35mm_point_shoot', 'cam_disposable'], lens: ['lens_28mm_reportage', 'lens_35mm_hyperfocal'],
     // Consumer/night film — agrees with the warm colours, the flash, the grain
     // and the huji/light-leak overlays. Ektachrome's "punchy primaries" would
     // fight color_muted_earth; Tri-X's B&W would fight both colour options.
@@ -117,7 +117,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   VINTAGE_FILM_NOSTALGIA: {
-    camera: ['cam_mamiya_rz67', 'cam_leica_m10'], lens: ['lens_110mm_f35', 'lens_50mm_f14'],
+    camera: ['cam_mamiya_rz67', 'cam_leica_m10'], lens: ['lens_110mm_f35'],
     filmStock: ['film_portra_400', 'film_gold_200'], lighting: ['light_golden_hour', 'light_north_window'],
     composition: ['comp_rule_of_thirds'], motion: ['motion_still_meditative', 'motion_freeze'],
     texture: ['tex_dust_scratches', 'tex_fine_film_grain'],
@@ -129,7 +129,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   SILHOUETTE_ATMOSPHERE: {
-    camera: ['cam_anamorphic_cine'], lens: ['lens_24mm_wide', 'lens_85mm_portrait'],
+    camera: ['cam_anamorphic_cine'], lens: ['lens_24mm_wide'],
     // CineStill 800T's "red halation blooming around lights" is the literal
     // subject of this technique ("the light source, not the face"). It also ends
     // the confirmed demo bug where an anchor-free filmStock pulled Ektachrome's
@@ -162,7 +162,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_piercing_object'],
   },
   DUOTONE_COLOR_WASH: {
-    camera: ['cam_leica_m10', 'cam_anamorphic_cine'], lens: ['lens_85mm_portrait', 'lens_50mm_f14'],
+    camera: ['cam_leica_m10', 'cam_anamorphic_cine'], lens: ['lens_135mm_f2'],
     lighting: ['light_single_gel', 'light_spotlight_halo'], filmStock: ['film_cinestill_800t'],
     composition: ['comp_centered_symmetry', 'comp_extreme_closeup'],
     // Fix 2: dropped color_duotone_cobalt — a cool blue wash contradicted
@@ -194,7 +194,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   MOTION_BLUR_STROBE: {
-    camera: ['cam_leica_m10'], lens: ['lens_50mm_f14', 'lens_35mm_hyperfocal'],
+    camera: ['cam_leica_m10'], lens: ['lens_35mm_hyperfocal'],
     // Night/tungsten film: CineStill's red halation around lights suits the
     // flash-and-practicals club setting and agrees with BOTH colour options
     // (warm tropical, crimson duotone). Also keeps it analog, matching the Leica.
@@ -206,7 +206,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   MIRROR_DOUBLE_EXPOSURE: {
-    camera: ['cam_leica_m10', 'cam_hasselblad_h6d'], lens: ['lens_85mm_portrait', 'lens_50mm_f14'],
+    camera: ['cam_leica_m10', 'cam_hasselblad_h6d'], lens: ['lens_50mm_f14'],
     // Palette-neutral by necessity: this is the one technique that must keep the
     // cool cobalt duotone available, and every other stock makes a colour claim
     // (warm/B&W/saturated) that would fight it.
@@ -224,7 +224,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_mirror_self'],
   },
   STUDIO_SEAMLESS_EDITORIAL: {
-    camera: ['cam_hasselblad_h6d', 'cam_leica_m10'], lens: ['lens_85mm_portrait', 'lens_80mm_f28'],
+    camera: ['cam_hasselblad_h6d', 'cam_leica_m10'], lens: ['lens_85mm_portrait'],
     lighting: ['light_high_key_wrap', 'light_direct_flash', 'light_spotlight_halo'],
     composition: ['comp_centered_symmetry', 'comp_offcenter_negative'], filmStock: ['film_ektachrome', 'film_digital_clean'],
     // Fix 2: dropped color_high_key_pastel — "soft airy pastel" fought
@@ -237,7 +237,7 @@ const TECHNIQUE_AFFINITY = {
     symbolism: ['sym_none'],
   },
   MONUMENTAL_SCALE_ISOLATION: {
-    camera: ['cam_anamorphic_cine'], lens: ['lens_24mm_wide'],
+    camera: ['cam_anamorphic_cine'], lens: ['lens_18mm_ultrawide'],
     // Warm, muted, analog — agrees with golden-hour light, muted_earth, and the
     // film grain. Ektachrome's punchy primaries would fight the muted palette.
     filmStock: ['film_portra_400', 'film_gold_200'],
