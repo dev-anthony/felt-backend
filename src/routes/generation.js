@@ -30,14 +30,14 @@ const { readEmotion, emotionalRegisterBlock } = require('../engine/emotion')
 const { buildFeatureVector } = require('../engine/dna/featureVector')
 
 /** Builds the labeled register block for a track + the artist's own words. */
-function buildEmotionalRegister(features, declaredGenre, intentText) {
+function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId) {
   try {
     const vector = buildFeatureVector(features)
-    const read = readEmotion(vector, declaredGenre, intentText)
+    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
     if (read.semanticCorrections.length) {
       console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic} | corrections: ${read.semanticCorrections.join('; ')}`)
     } else {
-      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}`)
+      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}` + (read.declaredEmotion ? ` | artist declared "${read.declaredEmotion.label}"` : ''))
     }
     return emotionalRegisterBlock(read, read.correctedVector)
   } catch (err) {
@@ -454,6 +454,9 @@ async function fetchArtistProfile(userId) {
 
 router.post('/expand', requireAuth, async (req, res) => {
   const { upload_id, basic_input } = req.body;
+  // The artist's selection from the emotion taxonomy. Optional: when absent the
+  // read is exactly as before, so older clients are unaffected.
+  const declaredEmotionId = req.body.declared_emotion || null
   const userId = req.user.id;
 
   if (!upload_id || !basic_input?.trim()) {
@@ -475,7 +478,7 @@ router.post('/expand', requireAuth, async (req, res) => {
     const artist = await fetchArtistProfile(userId);
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
 
-    const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input)
+    const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
 
     const promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
@@ -516,6 +519,9 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
 
 router.post('/transcribe', requireAuth, async (req, res) => {
   const { upload_id, artist_name } = req.body
+  // The artist's selection from the emotion taxonomy. Optional: when absent the
+  // read is exactly as before, so older clients are unaffected.
+  const declaredEmotionId = req.body.declared_emotion || null
   const userId = req.user.id
 
   if (!upload_id) {
@@ -640,7 +646,7 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     if (!lyricsText || !lyricsText.trim()) {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
-      const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput)
+      const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
       promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
@@ -654,7 +660,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       console.log(`[TRANSCRIPTION SUCCESS] Lyrics resolved via ${source}. Distilling structure.`);
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
-      const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`)
+      const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId)
       promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:

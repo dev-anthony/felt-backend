@@ -26,7 +26,7 @@
  */
 
 const { ARCHETYPES, AESTHETIC_STATES, INTENSITY_TIERS } = require('./archetypes')
-const { getEmotion } = require('./taxonomy')
+const { getEmotion, EMOTIONS, groupedByArchetype } = require('./taxonomy')
 const { anchorScore } = require('../dna/scoring')
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n))
@@ -320,7 +320,7 @@ function emotionalRegisterBlock(read, vector) {
     read.declaredEmotion
       ? `THE ARTIST CALLS THIS: "${read.declaredEmotion.label}" — ${read.declaredEmotion.definition}` +
         (read.declaredEmotion.archetype !== read.archetypeId
-          ? ' The audio reads differently, and BOTH are true: build a scene where the artist's'
+          ? ' The audio reads differently, and BOTH are true: build a scene where this'
             + ' feeling is what the person in it is actually experiencing, inside the world the'
             + ' audio describes. Do not resolve the contradiction — it is the point.'
           : '')
@@ -350,6 +350,9 @@ function emotionDnaBias(read) {
 }
 
 module.exports = {
+  EMOTIONS,
+  groupedByArchetype,
+  getEmotion,
   readEmotion,
   emotionalRegisterBlock,
   emotionDnaBias,

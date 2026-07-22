@@ -539,6 +539,95 @@ test('constraining the medium leaves the rest of the DNA deterministic', () => {
   assert.strictEqual(JSON.stringify(a.selections), JSON.stringify(b.selections))
 })
 
+// ── 16. Emotion taxonomy (artist-declared feeling) ────────────────────────
+const { EMOTIONS, groupedByArchetype, getEmotion, VALENCE_RANGE, AROUSAL_RANGE } =
+  require('./emotion/taxonomy')
+
+test('every emotion is complete and routes to a real archetype', () => {
+  const ids = new Set()
+  for (const e of EMOTIONS) {
+    for (const f of ['id', 'label', 'definition', 'archetype']) {
+      assert.ok(e[f], `emotion "${e.id}" missing ${f}`)
+    }
+    assert.ok(ARCHETYPES[e.archetype], `"${e.id}" routes to unknown archetype ${e.archetype}`)
+    assert.ok(!ids.has(e.id), `duplicate emotion id "${e.id}"`)
+    ids.add(e.id)
+  }
+})
+
+test('no emotion sits outside the measured range of real music', () => {
+  // Same DEAM band the archetype anchors were calibrated to. An emotion at 0.02
+  // would be unreachable rather than expressive.
+  for (const e of EMOTIONS) {
+    assert.ok(e.valence >= VALENCE_RANGE[0] && e.valence <= VALENCE_RANGE[1],
+      `${e.id} valence ${e.valence} outside ${VALENCE_RANGE.join('..')}`)
+    assert.ok(e.arousal >= AROUSAL_RANGE[0] && e.arousal <= AROUSAL_RANGE[1],
+      `${e.id} arousal ${e.arousal} outside ${AROUSAL_RANGE.join('..')}`)
+  }
+})
+
+test('all 12 families are offered to the artist', () => {
+  const fams = groupedByArchetype()
+  assert.strictEqual(fams.length, 12)
+  for (const f of fams) {
+    assert.ok(f.emotions.length >= 5, `${f.archetype} offers only ${f.emotions.length} feelings`)
+  }
+})
+
+test('an unknown or empty selection changes nothing', () => {
+  const v = buildFeatureVector(TRACK)
+  const base = readEmotion(v, '', '')
+  for (const bad of [null, undefined, '', 'not_an_emotion', 42, {}]) {
+    const r = readEmotion(buildFeatureVector(TRACK), '', '', bad)
+    assert.strictEqual(r.archetypeId, base.archetypeId, `input ${JSON.stringify(bad)} altered the read`)
+    assert.strictEqual(r.declaredEmotion, null)
+  }
+})
+
+test('a declared emotion never invents a third archetype', () => {
+  // The failure this guards: nudging valence down for "grief" penalises every
+  // valence-anchored archetype, letting one that anchors no valence at all
+  // (Euphoria, Primal) win by default — a reading neither party asked for.
+  const v = buildFeatureVector(TRACK)
+  const audioPick = readEmotion(v, '', '').archetypeId
+  for (const e of EMOTIONS) {
+    const r = readEmotion(buildFeatureVector(TRACK), '', '', e.id)
+    assert.ok(r.archetypeId === audioPick || r.archetypeId === e.archetype,
+      `"${e.id}" produced ${r.archetypeId}, which is neither the audio's ${audioPick} nor its own ${e.archetype}`)
+  }
+})
+
+test('the selection is a bounded nudge, not an override', () => {
+  // A strongly-read track must keep its own archetype: a mis-click cannot turn
+  // a jubilant record into a funeral.
+  const jubilant = {
+    bpm: 110, energy: 80, valence: 72, danceability: 88, acousticness: 20,
+    spectral_brightness: 68, speechiness: 15, loudness: -5, scale: 'major',
+  }
+  const alone = readEmotion(buildFeatureVector(jubilant), '', '').archetypeId
+  const claimed = readEmotion(buildFeatureVector(jubilant), '', '', 'grief').archetypeId
+  assert.strictEqual(claimed, alone, 'a single selection should not overturn an overwhelming audio read')
+})
+
+test('the artist selection always reaches the scene writer', () => {
+  // Even when it loses the archetype, the named feeling must be in the brief —
+  // this is the channel that keeps an upbeat record about heartbreak about
+  // heartbreak.
+  const v = buildFeatureVector(TRACK)
+  const block = emotionalRegisterBlock(readEmotion(v, '', '', 'saudade'), v)
+  assert.ok(block.includes('THE ARTIST CALLS THIS'), 'declared emotion missing from the register block')
+  assert.ok(block.includes('Saudade'), 'the label itself is missing')
+  const none = emotionalRegisterBlock(readEmotion(v, '', ''), v)
+  assert.ok(!none.includes('THE ARTIST CALLS THIS'), 'block should stay clean when nothing was selected')
+})
+
+test('declaring an emotion keeps the read deterministic', () => {
+  const a = readEmotion(buildFeatureVector(TRACK), '', '', 'defiance')
+  const b = readEmotion(buildFeatureVector(TRACK), '', '', 'defiance')
+  assert.strictEqual(JSON.stringify(a.visualDirection), JSON.stringify(b.visualDirection))
+  assert.strictEqual(a.archetypeId, b.archetypeId)
+})
+
 // ── report ────────────────────────────────────────────────────────────────
 console.log(`\n  ${passed} passed, ${failures.length} failed\n`)
 if (failures.length) {

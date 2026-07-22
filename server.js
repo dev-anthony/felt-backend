@@ -8,6 +8,7 @@ const onboardingRoutes = require('./src/routes/onboarding')
 const userRoutes = require('./src/routes/user')
 const uploadRoutes = require('./src/routes/uploads')
 const generationRoutes = require('./src/routes/generation')
+const emotionRoutes = require('./src/routes/emotions')
 
 const app = express()
 // app.enable('trust proxy')
@@ -51,6 +52,7 @@ app.use('/api/onboarding', onboardingRoutes)
 app.use('/api/user', userRoutes)
 app.use('/api/uploads', uploadRoutes)
 app.use('/api/generations', generationRoutes)
+app.use('/api/emotions', emotionRoutes)
 
 app.get('/health', (req, res) => {
   res.json({ status: 'FELT backend is running' })
