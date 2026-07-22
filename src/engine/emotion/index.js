@@ -26,6 +26,7 @@
  */
 
 const { ARCHETYPES, AESTHETIC_STATES, INTENSITY_TIERS } = require('./archetypes')
+const { getEmotion } = require('./taxonomy')
 const { anchorScore } = require('../dna/scoring')
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n))
@@ -40,9 +41,16 @@ const f01 = (n) => (Number.isFinite(n) ? clamp01(n) : 0.5)
  * the runner-up (tracks are rarely one pure feeling — the secondary read is
  * genuinely useful context for the scene writer).
  */
-function matchArchetypes(vector) {
+function matchArchetypes(vector, declaredEmotion) {
+  const favoured = declaredEmotion ? declaredEmotion.archetype : null
   const scored = Object.entries(ARCHETYPES)
-    .map(([id, a]) => ({ id, archetype: a, score: anchorScore(vector, a.anchor) }))
+    .map(([id, a]) => ({
+      id,
+      archetype: a,
+      // Bounded advantage, not a override: a strongly contrary audio read can
+      // still win, which is what keeps a mis-click recoverable.
+      score: anchorScore(vector, a.anchor) + (id === favoured ? EMOTION_ARCHETYPE_BONUS : 0),
+    }))
     .sort((x, y) => y.score - x.score)
   return { primary: scored[0], secondary: scored[1], ranked: scored }
 }
@@ -165,12 +173,85 @@ function applySemanticCorrection(vector, cues) {
  * @param {string} [declaredGenre] the artist's own declared lane, if any
  * @param {string} [intentText] the artist's own description / distilled lyric theme
  */
-function readEmotion(vector, declaredGenre, intentText) {
+/**
+ * ARTIST-DECLARED EMOTION — the third source.
+ *
+ * FELT reads a track three ways: the audio maths, the artist's words, and now an
+ * explicit selection from the emotion taxonomy. None of them overwrites another.
+ *
+ * This is a BOUNDED nudge, deliberately. The alternative — letting the selection
+ * win outright — sounds respectful of the artist but throws away the analysis on
+ * that track, and a mis-click then produces a confidently wrong cover. It also
+ * flattens the most interesting case: an upbeat Afrobeats breakup record is
+ * SUPPOSED to read as two things at once, and forcing agreement destroys exactly
+ * the tension that makes it worth looking at.
+ *
+ * So the selection pulls the vector toward its coordinates by at most
+ * EMOTION_PULL, and gives its archetype a bounded scoring advantage. A track
+ * whose audio already agrees barely moves; one that disagrees ends up genuinely
+ * between the two readings, which is the honest answer.
+ */
+const EMOTION_PULL = 0.22        // max shift on valence / energy
+const EMOTION_ARCHETYPE_BONUS = 0.10 // additive, applied in matchArchetypes
+
+function applyDeclaredEmotion(vector, emotion) {
+  if (!emotion) return { vector, applied: [] }
+  const v = { ...vector, meta: vector.meta }
+  const applied = []
+
+  const pull = (axis, target, label) => {
+    const before = v[axis]
+    if (!Number.isFinite(before) || !Number.isFinite(target)) return
+    const delta = Math.max(-EMOTION_PULL, Math.min(EMOTION_PULL, target - before))
+    v[axis] = clamp01(before + delta)
+    if (Math.abs(delta) >= 0.02) {
+      applied.push(`${label}${delta > 0 ? '↑' : '↓'} (artist selected "${emotion.label}")`)
+    }
+  }
+  pull('valence', emotion.valence, 'valence')
+  pull('energy', emotion.arousal, 'energy')
+
+  // Recompute the axes derived from what just moved, exactly as the semantic
+  // correction does — otherwise darkness/warmth/euphoria describe the old vector.
+  v.euphoria = clamp01(0.45 * v.valence + 0.30 * v.energy + 0.25 * v.danceability)
+  v.darkness = clamp01(0.45 * (1 - v.valence) + 0.30 * (1 - v.brightness) + 0.25 * (1 - v.scaleMajor))
+  v.warmth = clamp01(0.45 * v.valence + 0.30 * v.acousticness + 0.25 * v.scaleMajor)
+
+  return { vector: v, applied }
+}
+
+function readEmotion(vector, declaredGenre, intentText, declaredEmotionId) {
   const cues = readSemanticCues(intentText)
   const corrected = applySemanticCorrection(vector, cues)
   vector = corrected.vector
 
-  const { primary, secondary } = matchArchetypes(vector)
+  const emotion = getEmotion(declaredEmotionId)
+
+  // The archetype is chosen from the AUDIO's own reading, before the artist's
+  // selection moves the vector. This matters: nudging valence down to honour
+  // "grief" penalises every valence-anchored archetype, and an archetype that
+  // does not anchor valence at all (Euphoria, Primal) can then win by default —
+  // producing a third reading that neither the audio nor the artist asked for.
+  // A blend must resolve to ONE OF THE TWO readings, never to a stranger.
+  const audioRanked = matchArchetypes(vector).ranked
+
+  const declared = applyDeclaredEmotion(vector, emotion)
+  vector = declared.vector
+
+  // The nudged vector still drives aesthetic state, visual intensity and the DNA
+  // bias — that is where blending genuinely helps and cannot go non-sequitur.
+  let { primary, secondary } = matchArchetypes(vector, emotion)
+  if (emotion) {
+    const audioTop = audioRanked[0]
+    const declaredEntry = audioRanked.find((r) => r.id === emotion.archetype)
+    const candidates = [audioTop, declaredEntry].filter(Boolean)
+    // Bounded advantage for the artist's pick, so a strongly contrary audio read
+    // can still win and a mis-click stays recoverable.
+    const scoreOf = (c) => c.score + (c.id === emotion.archetype ? EMOTION_ARCHETYPE_BONUS : 0)
+    candidates.sort((a, b) => scoreOf(b) - scoreOf(a))
+    primary = candidates[0]
+    secondary = candidates[1] || secondary
+  }
   const state = routeAestheticState(vector)
   const intensity = scaleIntensity(vector)
 
@@ -202,7 +283,11 @@ function readEmotion(vector, declaredGenre, intentText) {
     // photographs, not the same photograph turned up.
     visualDirection: a.states[state.id][intensity.id],
     declaredGenre: declaredGenre || null,
-    semanticCorrections: corrected.applied,
+    semanticCorrections: corrected.applied.concat(declared.applied),
+    declaredEmotion: emotion
+      ? { id: emotion.id, label: emotion.label, definition: emotion.definition, archetype: emotion.archetype }
+      : null,
+    archetypeId: primary.id,
     correctedVector: vector,
   }
 }
@@ -227,6 +312,19 @@ function emotionalRegisterBlock(read, vector) {
     `INTENSITY: ${read.intensityLabel} — ${read.intensityDirective}`,
     kineticLine,
     `VISUAL DIRECTION FOR THIS COMBINATION: ${read.visualDirection}`,
+    // The artist's own word for the track. It reaches the scene writer even when
+    // it did not move the archetype — on a strongly-read track the audio rightly
+    // wins the register, but the feeling the artist named should still be
+    // findable in the frame. This is the channel where an "upbeat record about
+    // heartbreak" stays about heartbreak.
+    read.declaredEmotion
+      ? `THE ARTIST CALLS THIS: "${read.declaredEmotion.label}" — ${read.declaredEmotion.definition}` +
+        (read.declaredEmotion.archetype !== read.archetypeId
+          ? ' The audio reads differently, and BOTH are true: build a scene where the artist's'
+            + ' feeling is what the person in it is actually experiencing, inside the world the'
+            + ' audio describes. Do not resolve the contradiction — it is the point.'
+          : '')
+      : '',
     `DERIVED FROM: ${m.genre ? m.genre + ', ' : ''}${Math.round((vector.tempo * 120) + 60)} BPM, energy ${Math.round(vector.energy * 100)}/100, valence ${Math.round(vector.valence * 100)}/100, danceability ${Math.round(vector.danceability * 100)}/100, ${m.key} ${m.scale}`,
   ].join('\n')
 }
