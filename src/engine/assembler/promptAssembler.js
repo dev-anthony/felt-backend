@@ -17,19 +17,30 @@
 
 const { getSuffix, techniqueHidesFace } = require('../technique')
 const { getConcept } = require('../vocabulary')
-const { photographicRealityTail, illustrationRealityTail } = require('../reality')
+const { photographicRealityTail, illustrationRealityTail, cgiRealityTail } = require('../reality')
 
 // Non-photographic mediums whose presence must suppress the camera/film chain,
 // otherwise the prompt says both "screen-print" and "shot on a film camera".
-const NON_PHOTO_TAGS = ['risograph', 'screenprint', 'collage', 'painterly', 'oil', 'illustration', 'print']
+// Mediums fall into three families, each needing a different kind of "make it
+// real". All non-photo families suppress the physical capture chain (a camera
+// body and a film stock are physical objects a render or a drawing never had),
+// but they do NOT share a believability tail — see reality/index.js.
+const MEDIUM_FAMILY_TAGS = {
+  cgi: ['3d-cgi', 'cgi', 'render', 'cybernetic'],
+  illustration: ['risograph', 'screenprint', 'collage', 'painterly', 'oil',
+    'illustration', 'print', 'cel-shaded', 'anime', 'comic'],
+}
 
-function isPhotographicMedium(dna) {
+/** @returns {'photo'|'cgi'|'illustration'} */
+function mediumFamily(dna) {
   const sel = dna.selections.artMedium
-  if (!sel) return true
+  if (!sel) return 'photo'
   const concept = getConcept(sel.conceptId)
   const tags = (concept && concept.tags) || []
-  if (tags.includes('photo') || tags.includes('default')) return true
-  return !tags.some((t) => NON_PHOTO_TAGS.includes(t))
+  if (tags.includes('photo') || tags.includes('default')) return 'photo'
+  if (tags.some((t) => MEDIUM_FAMILY_TAGS.cgi.includes(t))) return 'cgi'
+  if (tags.some((t) => MEDIUM_FAMILY_TAGS.illustration.includes(t))) return 'illustration'
+  return 'photo'
 }
 
 function frag(dna, key) {
@@ -75,7 +86,8 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
   const dnaSym = dnaSymConfident ? dnaSymbolism.fragment : ''
   const symbolism = blueprintSym || dnaSym
 
-  const photographic = isPhotographicMedium(dna)
+  const family = mediumFamily(dna)
+  const photographic = family === 'photo'
 
   // Capture chain (camera/lens/film), grain texture and exposure-based motion
   // only make sense for a real photograph. For an illustrated medium they are
@@ -84,9 +96,14 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
     ? sentence([frag(dna, 'camera'), frag(dna, 'lens'), frag(dna, 'filmStock')])
     : ''
   const motionBlock = photographic ? sentence([frag(dna, 'motion')]) : ''
+  // postProcessing options are all analog-camera artifacts (light leak, Huji
+  // filter, film vignette, scan glitch), so CGI takes none of them; its finish
+  // comes from the PBR tail instead.
   const textureBlock = photographic
     ? sentence([frag(dna, 'texture'), frag(dna, 'postProcessing')])
-    : sentence([frag(dna, 'postProcessing')])
+    : family === 'cgi'
+      ? ''
+      : sentence([frag(dna, 'postProcessing')])
 
   const blocks = [
     // 1. Medium / editorial / graphic framing
@@ -121,13 +138,15 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
     // 13. Photographic Reality Engine tail (believability + AI-tell negatives).
     //     Doubles as the quality tail. Single-subject unless the caller opts into
     //     a group (default guards against the common unwanted-second-person leak).
-    photographic
+    family === 'photo'
       ? photographicRealityTail({
           singleSubject: !allowGroup,
           faceVisible: !techniqueHidesFace(technique),
           noPeople,
         })
-      : illustrationRealityTail(),
+      : family === 'cgi'
+        ? cgiRealityTail()
+        : illustrationRealityTail(),
   ]
 
   const prompt = blocks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()

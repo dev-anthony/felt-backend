@@ -33,14 +33,23 @@ function mulberry32(seed) {
  * dimensions the anchor declares. Returns a similarity score in 0..1
  * (1 = perfect match).
  */
-function anchorScore(vector, anchor, weights) {
-  const dims = Object.keys(anchor || {})
+function anchorScore(vector, anchor, weights, skipDims) {
+  // `skipDims` removes dimensions the track has no real measurement for (see
+  // dspDims in featureVector). Skipping is not the same as defaulting: a
+  // defaulted 0.5 against a 0.5 anchor reads as a PERFECT match on evidence that
+  // was never collected, quietly promoting whichever concept happens to anchor
+  // near the middle.
+  let dims = Object.keys(anchor || {})
+  if (skipDims && skipDims.size) dims = dims.filter((d) => !skipDims.has(d))
   if (dims.length === 0) return 0.5 // anchorless concept = neutral baseline
   let sum = 0
   let wsum = 0
   for (const dim of dims) {
     const w = (weights && weights[dim]) != null ? weights[dim] : 1
-    const actual = typeof vector[dim] === 'number' ? vector[dim] : 0.5
+    // Number.isFinite, not `typeof === 'number'`: NaN and Infinity are both
+    // typeof "number" and would otherwise poison `rms`, making every score NaN
+    // and the resulting ranking arbitrary.
+    const actual = Number.isFinite(vector[dim]) ? vector[dim] : 0.5
     const diff = actual - anchor[dim]
     sum += w * diff * diff
     wsum += w
@@ -68,7 +77,7 @@ function anchorScore(vector, anchor, weights) {
  * @param {string} [opts.fallbackId]     id to use if candidates is empty
  */
 function selectConcept(candidates, vector, opts = {}) {
-  const { technique, techniqueBonus = 0.12, preferredIds, preferredBonus = 0.30, explore = 0.35 } = opts
+  const { technique, techniqueBonus = 0.12, preferredIds, preferredBonus = 0.30, explore = 0.35, skipDims } = opts
   const list = Array.isArray(candidates) ? candidates.filter(Boolean) : []
   const preferred = preferredIds && preferredIds.length ? new Set(preferredIds) : null
 
@@ -80,7 +89,7 @@ function selectConcept(candidates, vector, opts = {}) {
   }
 
   const scored = list.map((c) => {
-    let score = anchorScore(vector, c.anchor, c.weights)
+    let score = anchorScore(vector, c.anchor, c.weights, skipDims)
     if (technique && Array.isArray(c.techniques) && c.techniques.includes(technique)) {
       score += techniqueBonus
     }

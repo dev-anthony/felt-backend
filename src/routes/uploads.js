@@ -5,6 +5,11 @@ const supabase = require('../utils/supabase')
 const { requireAuth } = require('../middleware/authmiddleware')
 const crypto = require('crypto')
 
+// Client-supplied DSP values are stored raw, so guard the type at the boundary:
+// a non-finite value persisted into audio_features would resurface as NaN in the
+// engine on every future generation for that track.
+const numOrNull = (v) => (Number.isFinite(v) ? v : null)
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
@@ -109,7 +114,11 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
 
   const {
     bpm, key, scale, energy, valence, danceability,
-    acousticness, spectral_brightness, loudness, mood, speechiness, genre
+    acousticness, spectral_brightness, loudness, mood, speechiness, genre,
+    // Research Module 3 DSP features. Optional and nullable by design: older
+    // clients (and any track analysed before this shipped) simply omit them,
+    // and every consumer treats absent as "unknown" rather than zero.
+    spectral_flux, spectral_flatness, sub_bass_ratio, onset_rate,
   } = payload
 
   const required = { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood }
@@ -142,7 +151,13 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
           bpm, key, scale, energy, valence, danceability,
           acousticness, spectral_brightness, loudness, mood,
           speechiness: speechiness ?? null,
-          genre: genre ?? 'hip-hop'
+          genre: genre ?? 'hip-hop',
+          // Module 3 — persisted raw (not normalised) so the calibration can be
+          // retuned later without re-analysing every track in the library.
+          spectral_flux: numOrNull(spectral_flux),
+          spectral_flatness: numOrNull(spectral_flatness),
+          sub_bass_ratio: numOrNull(sub_bass_ratio),
+          onset_rate: numOrNull(onset_rate),
         },
         status: 'analyzed',
       })
@@ -155,12 +170,15 @@ router.post('/:id/analysis', requireAuth, async (req, res) => {
       return res.status(500).json({ error: 'Failed to save analysis.' })
     }
 
-    let resolvedHint
-    if (speechiness !== undefined && speechiness !== null) {
-      resolvedHint = speechiness > 40 ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
-    } else {
-      resolvedHint = existing.track_type === 'vocal' ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
-    }
+    // track_type is the artist's own declaration, captured at upload and
+    // validated there — it is a stated fact, not an inference. Speechiness is a
+    // zero-crossing-rate proxy, and it used to override that fact whenever it
+    // was present: a sung ballad with sparse, sustained vocals reads low ZCR and
+    // was routed to FEELING_EXPANDER, skipping transcription entirely, while a
+    // busy percussive instrumental could be sent off to look for lyrics.
+    // Never let a weak measurement outvote something the user told us.
+    // Matches the upload route, which already routes on track_type alone.
+    const resolvedHint = existing.track_type === 'vocal' ? 'TRANSCRIBE' : 'FEELING_EXPANDER'
 
     return res.status(200).json({
       track: updated,

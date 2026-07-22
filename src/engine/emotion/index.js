@@ -30,6 +30,10 @@ const { anchorScore } = require('../dna/scoring')
 
 const clamp01 = (n) => Math.max(0, Math.min(1, n))
 const round3 = (n) => Math.round(n * 1000) / 1000
+// Neutral fallback for a single axis. Vectors from buildFeatureVector are
+// already sanitised; this covers vectors assembled by hand (tests, scripts) so
+// the state/intensity routers can never be steered by a NaN.
+const f01 = (n) => (Number.isFinite(n) ? clamp01(n) : 0.5)
 
 /**
  * Scores all 12 archetypes against the vector and returns the best match plus
@@ -52,16 +56,16 @@ function matchArchetypes(vector) {
  */
 function routeAestheticState(v) {
   const grittyScore =
-    0.40 * v.grit +
-    0.25 * v.speechiness +
-    0.20 * v.aggression +
-    0.15 * (1 - v.acousticness)
+    0.40 * f01(v.grit) +
+    0.25 * f01(v.speechiness) +
+    0.20 * f01(v.aggression) +
+    0.15 * (1 - f01(v.acousticness))
 
   const luxuryScore =
-    0.35 * v.brightness +
-    0.25 * (1 - v.grit) +
-    0.20 * (1 - v.speechiness) +
-    0.20 * v.loudness
+    0.35 * f01(v.brightness) +
+    0.25 * (1 - f01(v.grit)) +
+    0.20 * (1 - f01(v.speechiness)) +
+    0.20 * f01(v.loudness)
 
   // Deliberately conservative thresholds: "normal" is the honest default, and
   // over-routing to Luxury was a real source of glossy, generic results.
@@ -76,15 +80,20 @@ function routeAestheticState(v) {
  * very quiet but devastatingly sad track can still read as high intensity.
  */
 function scaleIntensity(v) {
-  const force = 0.40 * v.energy + 0.25 * v.loudness + 0.20 * v.motion + 0.15 * v.tempo
-  const extremity = Math.max(v.aggression, v.darkness, v.euphoria, v.intimacy)
+  const force =
+    0.40 * f01(v.energy) + 0.25 * f01(v.loudness) + 0.20 * f01(v.motion) + 0.15 * f01(v.tempo)
+  const extremity = Math.max(f01(v.aggression), f01(v.darkness), f01(v.euphoria), f01(v.intimacy))
   const raw = clamp01(0.65 * force + 0.35 * extremity)
 
+  // Ladder written so the FALL-THROUGH case is the top tier only when the score
+  // genuinely earns it. `raw` is finite by construction above, but the ordering
+  // matters: an unguarded NaN would fail every `<` and land on the final `else`,
+  // which is why "Extra High" must never be the accidental default.
   let id = 'medium'
-  if (raw < 0.34) id = 'low'
-  else if (raw < 0.58) id = 'medium'
-  else if (raw < 0.80) id = 'high'
-  else id = 'extreme'
+  if (raw >= 0.80) id = 'extreme'
+  else if (raw >= 0.58) id = 'high'
+  else if (raw >= 0.34) id = 'medium'
+  else id = 'low'
 
   return { id, score: round3(raw) }
 }
@@ -187,7 +196,11 @@ function readEmotion(vector, declaredGenre, intentText) {
     intensityLabel: tierInfo.label,
     intensityDirective: tierInfo.directive,
     kinetic: round3(kinetic),
-    visualDirection: a.states[state.id],
+    // Research Module 1: the visual direction is a 144-cell matrix lookup —
+    // archetype × aesthetic state × visual intensity. Both axes matter: a
+    // Gritty/Low melancholy and a Gritty/Extra High melancholy are different
+    // photographs, not the same photograph turned up.
+    visualDirection: a.states[state.id][intensity.id],
     declaredGenre: declaredGenre || null,
     semanticCorrections: corrected.applied,
     correctedVector: vector,

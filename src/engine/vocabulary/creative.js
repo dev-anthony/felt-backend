@@ -48,11 +48,11 @@ const EDITORIAL_STYLES = [
     anchor: { euphoria: 0.6, brightness: 0.6, energy: 0.55 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MOTION_BLUR_STROBE'] },
   { id: 'edit_street', category: 'editorial', tags: ['street', 'documentary', 'candid'],
-    fragment: 'raw street-photography realism',
+    fragment: 'raw street realism',
     anchor: { grit: 0.7, aggression: 0.55, energy: 0.6 },
     techniques: ['FLASH_DOCUMENTARY'] },
   { id: 'edit_fine_art', category: 'editorial', tags: ['fine-art', 'gallery', 'considered'],
-    fragment: 'a considered fine-art photographic sensibility',
+    fragment: 'a considered fine-art sensibility',
     anchor: { darkness: 0.55, intimacy: 0.55, valence: 0.4 },
     techniques: ['SURREAL_PRACTICAL_METAPHOR', 'SILHOUETTE_ATMOSPHERE'] },
   { id: 'edit_documentary', category: 'editorial', tags: ['documentary', 'honest', 'unstyled'],
@@ -89,6 +89,30 @@ const ART_MEDIUMS = [
   { id: 'medium_oil_texture', category: 'artMedium', tags: ['painterly', 'oil', 'texture'],
     fragment: 'a painterly surface with visible oil-paint impasto texture',
     anchor: { warmth: 0.6, darkness: 0.5, intimacy: 0.55 } },
+
+  // ── Research Module 5 mediums 2 and 3 ────────────────────────────────────
+  // Neither declares `techniques`, deliberately: `medium_photography` is the
+  // only medium with technique affinity (all 10), which is what keeps
+  // photographic realism the default. An illustrated medium must be a
+  // decisively better anchor match to win — that restraint is intentional.
+
+  // Module 5 / Medium 2. Research triggers: faded analog texture (vinyl
+  // crackle, tape hiss), detuned melodic lines, low-pass filtering, mid-tempo
+  // groove. Genres: lo-fi hip-hop, emo rap, hyperpop, synthwave, indie pop —
+  // which overlaps the NOSTALGIA archetype's territory almost exactly.
+  { id: 'medium_cel_shaded_anime', category: 'artMedium', tags: ['cel-shaded', 'anime', 'comic', 'illustration'],
+    fragment: 'a cel-shaded comic illustration with clean ink linework, flat shadow blocks and halftone screentone',
+    anchor: { warmth: 0.6, acousticness: 0.5, brightness: 0.35, tempo: 0.42, valence: 0.55 } },
+
+  // Module 5 / Medium 3. Research's defining triggers are Sub-Bass Ratio > 0.40
+  // and LOW spectral flatness (clinically clean digital synthesis) — both land
+  // in the DSP expansion. Until then this anchors on the closest signals we
+  // actually measure: synthetic (low acousticness), bright, high-energy, cold.
+  // TODO(dsp): add `subBass: 0.5` + `spectralFlatness: 0.2` once extracted —
+  // those are this medium's real identity, not the proxy below.
+  { id: 'medium_3d_cgi', category: 'artMedium', tags: ['3d-cgi', 'cgi', 'render', 'cybernetic'],
+    fragment: 'a hyper-glossy 3D render with ray-traced reflections, pristine geometry and emissive neon surfacing',
+    anchor: { acousticness: 0.12, brightness: 0.75, energy: 0.72, warmth: 0.22 } },
 ]
 
 /**

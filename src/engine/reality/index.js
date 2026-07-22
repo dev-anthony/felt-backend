@@ -93,9 +93,32 @@ function illustrationRealityTail() {
   )
 }
 
+// 3D CGI is a third kind of "real" entirely. It must NOT inherit the
+// illustration tail — "handmade ink, paper grain and registration imperfection"
+// directly contradicts a pristine ray-traced render, and it must not inherit the
+// photographic tail either (no film grain, no lens dust, no analog imperfection).
+// What makes CGI read as expensive rather than cheap is physically-based
+// rendering: correct light transport, real material response, clean geometry.
+function cgiRealityTail() {
+  return (
+    'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+    'Physically-based rendering with accurate light transport, true reflection and refraction, ' +
+    'subsurface scattering on skin, correct material roughness and metalness response, ' +
+    'clean topology with no distorted geometry, anatomically correct proportions and hands. ' +
+    // Deliberately does NOT reuse REALITY_NEGATIVES verbatim: that list bans an
+    // "over-smoothed CGI look", which is self-contradictory to hand a renderer.
+    // The anatomy/skin tells still matter, so they are restated without it.
+    'Absolutely no waxy plastic skin, airbrushed poreless faces, malformed or extra fingers, ' +
+    'warped doll faces, duplicated limbs, floating shapeless garments, ' +
+    'no film grain, no paper texture, no analog light leaks. ' +
+    'No text, letters, watermarks or logos rendered anywhere in the image.'
+  )
+}
+
 module.exports = {
   photographicRealityTail,
   illustrationRealityTail,
+  cgiRealityTail,
   REALITY_POSITIVES,
   REALITY_NEGATIVES,
 }

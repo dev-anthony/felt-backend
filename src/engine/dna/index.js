@@ -14,7 +14,7 @@
  * Technique, applied once to a copy of the vector before any layer runs.
  */
 
-const { buildFeatureVector } = require('./featureVector')
+const { buildFeatureVector, dspDims } = require('./featureVector')
 const { selectConcept } = require('./scoring')
 const { getCategory } = require('../vocabulary')
 const { applyTechniqueBias, getAffinity, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
@@ -68,6 +68,9 @@ function computeVisualDNA(rawFeatures, techniqueName) {
   const technique = isValidTechnique(techniqueName) ? techniqueName : DEFAULT_TECHNIQUE
   const vector = buildFeatureVector(rawFeatures)
   const biased = applyTechniqueBias(vector, technique)
+  // Module 3 axes this track has no real measurement for. Excluded from
+  // scoring so a legacy track cannot earn points on evidence it never had.
+  const skipDims = dspDims(vector)
 
   const selections = {}
   const fragments = {}
@@ -100,6 +103,7 @@ function computeVisualDNA(rawFeatures, techniqueName) {
       technique,
       explore: layer.explore,
       techniqueBonus: layer.bonus,
+      skipDims,
     })
     const chosen = selection || fallbackSelection(layer)
     chosen.layer = layer.key

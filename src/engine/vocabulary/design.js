@@ -10,7 +10,8 @@
 const COMPOSITION = [
   { id: 'comp_centered_symmetry', category: 'composition', tags: ['symmetry', 'centered', 'iconic'],
     fragment: 'a symmetrical centered composition with the subject anchored on the vertical axis',
-    anchor: { intimacy: 0.55, valence: 0.5, motion: 0.3 },
+    // Module 3 #5 — Spectral Flux <0.2 = 'perfect linear stability, central horizons'.
+    anchor: { intimacy: 0.55, valence: 0.5, motion: 0.3, spectralFlux: 0.15 },
     techniques: ['MIRROR_DOUBLE_EXPOSURE', 'DUOTONE_COLOR_WASH', 'MACRO_INTIMATE_DETAIL'] },
   { id: 'comp_rule_of_thirds', category: 'composition', tags: ['thirds', 'balanced', 'editorial'],
     fragment: 'the subject placed on a rule-of-thirds line with balanced negative space beside them',
@@ -21,15 +22,18 @@ const COMPOSITION = [
     techniques: ['MACRO_INTIMATE_DETAIL'] },
   { id: 'comp_offcenter_negative', category: 'composition', tags: ['asymmetry', 'negative-space', 'tension'],
     fragment: 'an off-center subject pushed to one edge with a dominant field of negative space',
-    anchor: { darkness: 0.5, aggression: 0.5, motion: 0.55 },
+    // Module 3 #5 — Spectral Flux >0.8 'shatters the frame layout', asymmetric fracturing.
+    anchor: { darkness: 0.5, aggression: 0.5, motion: 0.55, spectralFlux: 0.8 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'comp_monumental_scale', category: 'composition', tags: ['scale', 'tiny-subject', 'isolation'],
     fragment: 'a tiny subject dwarfed at the bottom edge by one massive dominant element filling the frame',
-    anchor: { darkness: 0.55, intimacy: 0.4, energy: 0.35 },
+    // Module 3 #10 — the 'massive, imposing structural silhouettes' half of the same rule.
+    anchor: { darkness: 0.55, intimacy: 0.4, energy: 0.35, subBass: 0.42 },
     techniques: ['MONUMENTAL_SCALE_ISOLATION', 'SILHOUETTE_ATMOSPHERE'] },
   { id: 'comp_low_angle_hero', category: 'composition', tags: ['low-angle', 'power', 'hero'],
     fragment: 'a low camera angle looking up at the subject for a dominant, heroic stance',
-    anchor: { aggression: 0.6, energy: 0.65, euphoria: 0.5 },
+    // Module 3 #10 — Sub-Bass >0.35 forces 'extreme low-angle perspectives looking up'.
+    anchor: { aggression: 0.6, energy: 0.65, euphoria: 0.5, subBass: 0.45 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'comp_tight_enclosure', category: 'composition', tags: ['claustrophobic', 'enclosed', 'tight'],
     fragment: 'a claustrophobic tight frame with the subject boxed in by enclosing geometry',

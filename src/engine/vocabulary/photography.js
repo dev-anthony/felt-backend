@@ -97,7 +97,8 @@ const FILM_STOCKS = [
     techniques: ['DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE'] },
   { id: 'film_trix_400', category: 'filmStock', tags: ['b&w', 'grainy', 'contrast', 'gritty'],
     fragment: 'high-contrast Kodak Tri-X 400 black-and-white with coarse grain',
-    anchor: { grit: 0.7, aggression: 0.6, darkness: 0.55, scaleMajor: 0.2 },
+    // Module 3 #8 — Spectral Flatness >0.65 maps to pushed analog film stock.
+    anchor: { grit: 0.7, aggression: 0.6, darkness: 0.55, scaleMajor: 0.2, spectralFlatness: 0.72 },
     techniques: ['FLASH_DOCUMENTARY', 'SURREAL_PRACTICAL_METAPHOR'] },
   { id: 'film_ektachrome', category: 'filmStock', tags: ['slide', 'saturated', 'punchy'],
     fragment: 'Ektachrome slide-film saturation with punchy, clean primaries',
@@ -109,7 +110,8 @@ const FILM_STOCKS = [
     techniques: ['VINTAGE_FILM_NOSTALGIA', 'FLASH_DOCUMENTARY'] },
   { id: 'film_digital_clean', category: 'filmStock', tags: ['digital', 'clean', 'sharp'],
     fragment: 'clean digital medium-format capture with fine un-airbrushed detail',
-    anchor: { brightness: 0.65, energy: 0.55, acousticness: 0.3, grit: 0.2 },
+    // Module 3 #8 — low flatness (clean digital synthesis) forces digital precision.
+    anchor: { brightness: 0.65, energy: 0.55, acousticness: 0.3, grit: 0.2, spectralFlatness: 0.18 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MACRO_INTIMATE_DETAIL'] },
 ]
 
@@ -193,23 +195,29 @@ const MOTION = [
 const TEXTURE = [
   { id: 'tex_fine_film_grain', category: 'texture', tags: ['grain', 'analog', 'fine'],
     fragment: 'fine visible 35mm film grain throughout',
-    anchor: { acousticness: 0.5, grit: 0.45, warmth: 0.5 } },
+    // Module 3 #8 — mid flatness: organic analog texture without heavy distortion.
+    anchor: { acousticness: 0.5, grit: 0.45, warmth: 0.5, spectralFlatness: 0.45 } },
   { id: 'tex_heavy_grain', category: 'texture', tags: ['grain', 'coarse', 'gritty'],
     fragment: 'heavy coarse film grain and lifted blacks',
-    anchor: { grit: 0.75, aggression: 0.6, darkness: 0.55 },
+    // Module 3 #8 — high flatness loads coarse silver-halide grain.
+    anchor: { grit: 0.75, aggression: 0.6, darkness: 0.55, spectralFlatness: 0.7 },
     techniques: ['FLASH_DOCUMENTARY', 'SURREAL_PRACTICAL_METAPHOR'] },
   { id: 'tex_xerox_halftone', category: 'texture', tags: ['xerox', 'photocopy', 'halftone', 'ink'],
     fragment: 'coarse high-contrast xerox photocopy grain with subtle ink bleed and a halftone dot pattern',
-    anchor: { grit: 0.8, aggression: 0.7, speechiness: 0.6 },
+    anchor: { grit: 0.8, aggression: 0.7, speechiness: 0.6, spectralFlatness: 0.85 },
     techniques: ['FLASH_DOCUMENTARY'],
     source: 'research: parental-advisory / mixtape xerox texture' },
   { id: 'tex_dust_scratches', category: 'texture', tags: ['dust', 'scratches', 'wear', 'analog'],
     fragment: 'subtle dust, hairline scratches and paper-tooth texture as if scanned from an old print',
-    anchor: { acousticness: 0.65, warmth: 0.55, energy: 0.35 },
+    // Module 3 #7 — Onset Density >12/sec 'floods the frame' with airborne dust and
+    // particulate. 0.55 on the normalised 0..25 scale = ~14 onsets/sec.
+    anchor: { acousticness: 0.65, warmth: 0.55, energy: 0.35, onsetRate: 0.55 },
     techniques: ['VINTAGE_FILM_NOSTALGIA'] },
   { id: 'tex_clean_detail', category: 'texture', tags: ['clean', 'detail', 'pores'],
     fragment: 'pristine sensor clarity resolving real un-airbrushed skin pores and textile weave',
-    anchor: { brightness: 0.65, grit: 0.2, intimacy: 0.5 },
+    // Module 3 #7 — Onset Density <2/sec produces 'hyper-clean, barren spaces'.
+    // 0.10 on the normalised 0..25 scale = ~2.5 onsets/sec.
+    anchor: { brightness: 0.65, grit: 0.2, intimacy: 0.5, onsetRate: 0.10, spectralFlatness: 0.2 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'STUDIO_SEAMLESS_EDITORIAL'] },
 ]
 
