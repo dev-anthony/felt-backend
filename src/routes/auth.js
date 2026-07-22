@@ -172,31 +172,6 @@ router.post('/login', async (req, res) => {
  * POST /api/auth/logout
  * Pulls token either from cookies or fallback header
  */
-// router.post('/logout', async (req, res) => {
-//   // Use cookie-parser fallback or headers extraction
-//   const token = req.cookies?.access_token || req.headers.authorization?.split(' ')[1]
-
-//   if (!token) {
-//     return res.status(400).json({ error: 'No active session found' })
-//   }
-
-//   try {
-//     const { error } = await supabase.auth.admin.signOut(token)
-
-//     if (error) {
-//       return res.status(400).json({ error: error.message })
-//     }
-
-//     // Explicitly wipe cookies on completion
-//     res.clearCookie('access_token', { path: '/' })
-//     res.clearCookie('refresh_token', { path: '/' })
-
-//     return res.status(200).json({ message: 'Logged out' })
-//   } catch (err) {
-//     console.error('Logout error:', err)
-//     return res.status(500).json({ error: 'Something went wrong.' })
-//   }
-// })
 /**
  * POST /api/auth/logout
  */

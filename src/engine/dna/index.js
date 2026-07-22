@@ -18,6 +18,9 @@ const { buildFeatureVector, dspDims } = require('./featureVector')
 const { selectConcept } = require('./scoring')
 const { getCategory } = require('../vocabulary')
 const { applyTechniqueBias, getAffinity, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
+// Safe require order: emotion/index pulls in dna/scoring only, never dna/index,
+// so this is a tree rather than a cycle.
+const { readEmotion, emotionDnaBias } = require('../emotion')
 
 /**
  * Layer registry. `priority` orders fragments in the assembled prompt and
@@ -64,10 +67,35 @@ function fallbackSelection(layer) {
  * @param {string} [techniqueName]
  * @returns {import('../types').VisualDNA}
  */
+/**
+ * Additive, clamped bias over the numeric dimensions of a vector. Same
+ * semantics as applyTechniqueBias so the two compose predictably; `meta` is
+ * carried by reference because it holds the PRNG seed and DSP presence flags.
+ */
+function applyBias(vector, bias) {
+  if (!bias) return vector
+  const out = { ...vector, meta: vector.meta }
+  for (const [dim, delta] of Object.entries(bias)) {
+    if (typeof out[dim] === 'number') {
+      out[dim] = Math.max(0, Math.min(1, out[dim] + delta))
+    }
+  }
+  return out
+}
+
 function computeVisualDNA(rawFeatures, techniqueName) {
   const technique = isValidTechnique(techniqueName) ? techniqueName : DEFAULT_TECHNIQUE
   const vector = buildFeatureVector(rawFeatures)
-  const biased = applyTechniqueBias(vector, technique)
+
+  // EMOTIONAL BIAS — the emotion layer's read of the track (aesthetic state,
+  // visual intensity, kinetic level) nudges the vector before any concept is
+  // scored, so a Gritty/Luxury world and a High/Low intensity actually change
+  // WHICH vocabulary wins rather than only what the prompt text says. Applied
+  // before the technique bias so an explicit art direction still has the last
+  // word. Deterministic: derived purely from the same features.
+  const emotion = readEmotion(vector, vector.meta.genre, '')
+  const biased = applyTechniqueBias(applyBias(vector, emotionDnaBias(emotion)), technique)
+
   // Module 3 axes this track has no real measurement for. Excluded from
   // scoring so a legacy track cannot earn points on evidence it never had.
   const skipDims = dspDims(vector)

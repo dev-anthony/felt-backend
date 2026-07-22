@@ -290,6 +290,104 @@ test('a partial payload (older client) still works', () => {
   assert.ok(computeVisualDNA(partial, DEFAULT_TECHNIQUE).selections.composition)
 })
 
+// ── 9. Research Module 5 — the 3D CGI medium ──────────────────────────────
+const CGI_TRACK = {
+  bpm: 128, energy: 80, valence: 35, danceability: 75, acousticness: 8,
+  spectral_brightness: 78, speechiness: 15, loudness: -5, key: 'A', scale: 'minor',
+  genre: 'industrial techno',
+}
+const CGI_DSP = { sub_bass_ratio: 0.48, spectral_flatness: 0.10, spectral_flux: 0.4, onset_rate: 6 }
+
+test('CGI medium is reachable in its research territory', () => {
+  const dna = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP }, 'FLASH_DOCUMENTARY')
+  assert.strictEqual(dna.selections.artMedium.conceptId, 'medium_3d_cgi',
+    'sub-bass >0.40 with low flatness should reach the CGI medium')
+})
+
+test('CGI never hijacks an acoustic track that has no DSP data', () => {
+  const ballad = {
+    bpm: 82, energy: 25, valence: 60, danceability: 35, acousticness: 85,
+    spectral_brightness: 25, speechiness: 8, loudness: -16, scale: 'major',
+  }
+  for (const t of Object.keys(TECHNIQUES)) {
+    assert.notStrictEqual(computeVisualDNA(ballad, t).selections.artMedium.conceptId,
+      'medium_3d_cgi', `${t}: acoustic ballad must not select CGI`)
+  }
+})
+
+// ── 10. Module 3 Equation 1 — aperture tracks spectral centroid ───────────
+test('Eq1: depth of field follows spectral centroid', () => {
+  const dark = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP, spectral_brightness: 10 }, 'FLASH_DOCUMENTARY')
+  const bright = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP, spectral_brightness: 95 }, 'FLASH_DOCUMENTARY')
+  assert.strictEqual(bright.selections.lens.conceptId, 'lens_35mm_hyperfocal',
+    'high centroid should reach the deep-focus (f/8-f/11) pole')
+  assert.notStrictEqual(dark.selections.lens.conceptId, bright.selections.lens.conceptId)
+})
+
+test('Eq1: every lens declares brightness so the DoF axis is total', () => {
+  for (const c of getCategory('lens')) {
+    assert.ok(typeof c.anchor.brightness === 'number',
+      `${c.id} has no brightness anchor, so centroid cannot rank it`)
+  }
+})
+
+// ── 11. Module 3 Equation 2 — shutter regime is exhaustive ────────────────
+test('Eq2: every motion concept declares all three shutter inputs', () => {
+  for (const c of getCategory('motion')) {
+    for (const dim of ['tempo', 'onsetRate', 'spectralFlux']) {
+      assert.ok(typeof c.anchor[dim] === 'number', `${c.id} missing ${dim}`)
+    }
+  }
+})
+
+test('Eq2: the four shutter regimes are all reachable', () => {
+  const base = { ...CGI_TRACK, ...CGI_DSP }
+  const got = new Set([
+    computeVisualDNA({ ...base, bpm: 62, spectral_flux: 0.80, onset_rate: 3 }, 'MOTION_BLUR_STROBE').selections.motion.conceptId,
+    computeVisualDNA({ ...base, bpm: 168, spectral_flux: 0.55, onset_rate: 12 }, 'MOTION_BLUR_STROBE').selections.motion.conceptId,
+    computeVisualDNA({ ...base, bpm: 64, spectral_flux: 0.08, onset_rate: 1, danceability: 20, energy: 20 }, 'VINTAGE_FILM_NOSTALGIA').selections.motion.conceptId,
+    computeVisualDNA({ ...base, bpm: 170, spectral_flux: 0.6, onset_rate: 13, danceability: 85, energy: 90 }, 'VINTAGE_FILM_NOSTALGIA').selections.motion.conceptId,
+  ])
+  for (const id of ['motion_shutter_drag', 'motion_strobe_freeze', 'motion_still_meditative', 'motion_freeze']) {
+    assert.ok(got.has(id), `shutter regime ${id} unreachable (got: ${[...got].join(', ')})`)
+  }
+})
+
+test('Eq2: the 80-90 BPM gap in the published function now resolves', () => {
+  // The research's piecewise Phi matched no case for 80 < BPM < 90 with SF < 0.7.
+  for (let bpm = 78; bpm <= 92; bpm += 2) {
+    const m = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP, bpm, spectral_flux: 0.5 }, DEFAULT_TECHNIQUE).selections.motion
+    assert.ok(m && m.conceptId, `no motion resolved at ${bpm} BPM`)
+  }
+})
+
+// ── 12. Emotional bias is wired and deterministic ─────────────────────────
+test('emotionDnaBias reaches concept selection', () => {
+  const { emotionDnaBias, readEmotion } = require('./emotion')
+  const gritty = readEmotion(buildFeatureVector({ ...TRACK, speechiness: 95, acousticness: 3, energy: 95 }), '', '')
+  const bias = emotionDnaBias(gritty)
+  assert.ok(Object.keys(bias).length > 0, 'a gritty read should produce a non-empty bias')
+  // and it must not break determinism
+  const a = computeVisualDNA({ ...TRACK, ...DSP }, 'FLASH_DOCUMENTARY')
+  const b = computeVisualDNA({ ...TRACK, ...DSP }, 'FLASH_DOCUMENTARY')
+  assert.strictEqual(JSON.stringify(a.selections), JSON.stringify(b.selections))
+})
+
+test('bias application never pushes a dimension outside 0..1', () => {
+  for (const extreme of [
+    { energy: 100, speechiness: 100, acousticness: 0, loudness: 0, danceability: 100, bpm: 240 },
+    { energy: 0, speechiness: 0, acousticness: 100, loudness: -60, danceability: 0, bpm: 40 },
+  ]) {
+    const dna = computeVisualDNA({ ...TRACK, ...extreme }, 'FLASH_DOCUMENTARY')
+    for (const layer of Object.keys(dna.selections)) {
+      const c = dna.selections[layer]
+      assert.ok(c && typeof c.confidence === 'number' && Number.isFinite(c.confidence),
+        `${layer} confidence is ${c && c.confidence}`)
+      assert.ok(c.confidence >= 0 && c.confidence <= 1, `${layer} confidence out of range`)
+    }
+  }
+})
+
 // ── report ────────────────────────────────────────────────────────────────
 console.log(`\n  ${passed} passed, ${failures.length} failed\n`)
 if (failures.length) {

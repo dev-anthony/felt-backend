@@ -39,12 +39,17 @@ function anchorScore(vector, anchor, weights, skipDims) {
   // defaulted 0.5 against a 0.5 anchor reads as a PERFECT match on evidence that
   // was never collected, quietly promoting whichever concept happens to anchor
   // near the middle.
-  let dims = Object.keys(anchor || {})
-  if (skipDims && skipDims.size) dims = dims.filter((d) => !skipDims.has(d))
+  const dims = Object.keys(anchor || {})
   if (dims.length === 0) return 0.5 // anchorless concept = neutral baseline
+  // Skip inline rather than `dims.filter(...)`: this runs once per concept per
+  // layer per call (~105 concepts x 15 layers), and the filtered copy was
+  // allocating a throwaway array every time — it made the legacy no-DSP path
+  // measurably slower than the full-DSP path, which is backwards.
+  const skipping = !!(skipDims && skipDims.size)
   let sum = 0
   let wsum = 0
   for (const dim of dims) {
+    if (skipping && skipDims.has(dim)) continue
     const w = (weights && weights[dim]) != null ? weights[dim] : 1
     // Number.isFinite, not `typeof === 'number'`: NaN and Infinity are both
     // typeof "number" and would otherwise poison `rms`, making every score NaN
@@ -54,6 +59,7 @@ function anchorScore(vector, anchor, weights, skipDims) {
     sum += w * diff * diff
     wsum += w
   }
+  if (wsum === 0) return 0.5 // every declared dim was skipped
   const rms = Math.sqrt(sum / wsum) // 0 (identical) .. 1 (opposite)
   return 1 - rms
 }

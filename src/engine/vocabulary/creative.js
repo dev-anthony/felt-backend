@@ -104,15 +104,23 @@ const ART_MEDIUMS = [
     fragment: 'a cel-shaded comic illustration with clean ink linework, flat shadow blocks and halftone screentone',
     anchor: { warmth: 0.6, acousticness: 0.5, brightness: 0.35, tempo: 0.42, valence: 0.55 } },
 
-  // Module 5 / Medium 3. Research's defining triggers are Sub-Bass Ratio > 0.40
-  // and LOW spectral flatness (clinically clean digital synthesis) — both land
-  // in the DSP expansion. Until then this anchors on the closest signals we
-  // actually measure: synthetic (low acousticness), bright, high-energy, cold.
-  // TODO(dsp): add `subBass: 0.5` + `spectralFlatness: 0.2` once extracted —
-  // those are this medium's real identity, not the proxy below.
+  // Module 5 / Medium 3. The research names this medium's defining triggers
+  // explicitly: "heavy sub-bass energy ratios (>0.40), low spectral flatness
+  // scores" (clinically clean digital synthesis, zero organic reverb).
+  //
+  // Both are now measured, and both are gated by `dspDims`: a track analysed
+  // before the DSP pass shipped skips these dimensions entirely rather than
+  // defaulting them. That gating is what makes the anchor safe — without it a
+  // neutral 0.5 default would sit a perfect distance from a 0.45 anchor and
+  // hand CGI free points on evidence the track never carried (measured: it
+  // lifted an acoustic ballad's CGI score 0.427 -> 0.517).
   { id: 'medium_3d_cgi', category: 'artMedium', tags: ['3d-cgi', 'cgi', 'render', 'cybernetic'],
     fragment: 'a hyper-glossy 3D render with ray-traced reflections, pristine geometry and emissive neon surfacing',
-    anchor: { acousticness: 0.12, brightness: 0.75, energy: 0.72, warmth: 0.22 } },
+    anchor: {
+      acousticness: 0.12, brightness: 0.75, energy: 0.72, warmth: 0.22,
+      subBass: 0.45,          // Module 5: ">0.40"
+      spectralFlatness: 0.15, // Module 5: "low spectral flatness scores"
+    } },
 ]
 
 /**

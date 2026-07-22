@@ -46,7 +46,8 @@ const LENSES = [
     anchor: { brightness: 0.6, energy: 0.55, grit: 0.25 } },
   { id: 'lens_50mm_f14', category: 'lens', tags: ['fast', 'organic', 'edge-falloff'],
     fragment: '50mm lens wide open at f/1.4 with organic vintage edge falloff',
-    anchor: { motion: 0.65, intimacy: 0.5, danceability: 0.6 },
+    // Eq 1: f/1.4 is the shallow pole -> low spectral centroid.
+    anchor: { motion: 0.65, intimacy: 0.5, danceability: 0.6, brightness: 0.30 },
     techniques: ['MOTION_BLUR_STROBE', 'MACRO_INTIMATE_DETAIL'] },
   { id: 'lens_85mm_portrait', category: 'lens', tags: ['portrait', 'telephoto', 'bokeh', 'flattering'],
     fragment: '85mm portrait lens at f/1.4, shallow depth of field, creamy background bokeh and flattering facial compression',
@@ -55,10 +56,12 @@ const LENSES = [
     source: 'research: /PROMT reference — 85mm, soft bokeh, shallow DOF editorial portrait' },
   { id: 'lens_110mm_f35', category: 'lens', tags: ['short-tele', 'soft', 'medium-format'],
     fragment: '110mm lens at f/3.5 with soft rolling-focus bokeh',
-    anchor: { acousticness: 0.65, intimacy: 0.6, energy: 0.3 } },
+    // Eq 1: f/3.5 sits between the shallow and deep poles.
+    anchor: { acousticness: 0.65, intimacy: 0.6, energy: 0.3, brightness: 0.42 } },
   { id: 'lens_35mm_hyperfocal', category: 'lens', tags: ['wide-normal', 'deep-focus', 'documentary'],
     fragment: '35mm lens set to hyperfocal distance, everything in gritty focus',
-    anchor: { grit: 0.7, energy: 0.65, aggression: 0.55 },
+    // Eq 1: hyperfocal is f/8-f/11, the deep-focus pole -> high centroid.
+    anchor: { grit: 0.7, energy: 0.65, aggression: 0.55, brightness: 0.80 },
     techniques: ['FLASH_DOCUMENTARY'] },
   { id: 'lens_24mm_wide', category: 'lens', tags: ['wide', 'scale', 'environmental'],
     fragment: '24mm wide lens exaggerating the scale of the environment',
@@ -69,19 +72,24 @@ const LENSES = [
   // different were being shot through the same glass.
   { id: 'lens_18mm_ultrawide', category: 'lens', tags: ['ultra-wide', 'scale', 'distortion'],
     fragment: '18mm ultra-wide lens stretching the foreground and dwarfing the subject against the space',
-    anchor: { darkness: 0.5, intimacy: 0.25, energy: 0.4 },
+    // Eq 1: an 18mm carries enormous depth of field at any practical stop, so
+    // it sits near the deep-focus pole (just short of true hyperfocal).
+    anchor: { darkness: 0.5, intimacy: 0.25, energy: 0.4, brightness: 0.68 },
     techniques: ['MONUMENTAL_SCALE_ISOLATION'] },
   { id: 'lens_28mm_reportage', category: 'lens', tags: ['wide-normal', 'reportage', 'candid', 'close-in'],
     fragment: '28mm reportage lens working close in, immersive with a slight edge stretch',
-    anchor: { grit: 0.65, energy: 0.65, motion: 0.55 },
+    // Eq 1: mid-stopped reportage aperture.
+    anchor: { grit: 0.65, energy: 0.65, motion: 0.55, brightness: 0.58 },
     techniques: ['FLASH_DOCUMENTARY'] },
   { id: 'lens_135mm_f2', category: 'lens', tags: ['telephoto', 'compression', 'isolation'],
     fragment: '135mm f/2 telephoto compressing the background into a soft wash behind the subject',
-    anchor: { intimacy: 0.6, darkness: 0.55, motion: 0.3 },
+    // Eq 1: f/2, shallow.
+    anchor: { intimacy: 0.6, darkness: 0.55, motion: 0.3, brightness: 0.35 },
     techniques: ['DUOTONE_COLOR_WASH'] },
   { id: 'lens_100mm_macro', category: 'lens', tags: ['macro', 'detail', 'shallow'],
     fragment: '100mm macro lens with razor-thin depth of field and soft falloff',
-    anchor: { intimacy: 0.8, acousticness: 0.55, energy: 0.3 },
+    // Eq 1: razor-thin DoF is the shallowest end of the scale.
+    anchor: { intimacy: 0.8, acousticness: 0.55, energy: 0.3, brightness: 0.30 },
     techniques: ['MACRO_INTIMATE_DETAIL'] },
 ]
 
@@ -171,23 +179,34 @@ const LIGHTING = [
 const MOTION = [
   { id: 'motion_freeze', category: 'motion', tags: ['sharp', 'frozen', 'still'],
     fragment: 'tack-sharp frozen instant, no motion blur',
-    anchor: { motion: 0.2, energy: 0.4, danceability: 0.3 } },
+    // Eq 2 High-Speed Transient Freeze: fast and percussively dense.
+    anchor: { motion: 0.2, energy: 0.4, danceability: 0.3,
+      tempo: 0.72, onsetRate: 0.42, spectralFlux: 0.55 } },
   { id: 'motion_shutter_drag', category: 'motion', tags: ['long-exposure', 'blur-trails', 'rhythm'],
     fragment: 'shutter-drag technique, a 1/15s long exposure trailing organic horizontal motion blur across the subject',
-    anchor: { motion: 0.8, danceability: 0.75, energy: 0.6 },
+    // Eq 2 Intentional Camera Motion: slow tempo with high structural flux.
+    anchor: { motion: 0.8, danceability: 0.75, energy: 0.6,
+      tempo: 0.25, onsetRate: 0.20, spectralFlux: 0.75 },
     techniques: ['MOTION_BLUR_STROBE'],
     source: 'research: Tems shutter-drag editorial motion' },
   { id: 'motion_strobe_freeze', category: 'motion', tags: ['strobe', 'blur+sharp', 'mania'],
     fragment: 'a slow shutter with one strobe pop, directional blur trails frozen at a single sharp instant',
-    anchor: { motion: 0.7, aggression: 0.6, energy: 0.7 },
+    // Eq 2 Stroboscopic Capture: dense onsets AND violent spectral change.
+    anchor: { motion: 0.7, aggression: 0.6, energy: 0.7,
+      tempo: 0.60, onsetRate: 0.50, spectralFlux: 0.85 },
     techniques: ['MOTION_BLUR_STROBE'] },
   { id: 'motion_double_exposure', category: 'motion', tags: ['double-exposure', 'ghosting', 'duality'],
     fragment: 'a real in-camera double exposure, the second layer slightly misaligned and ghosted',
-    anchor: { darkness: 0.5, intimacy: 0.5, motion: 0.4 },
+    // Eq 2 Standard Documentary mid-band - the region the research left as a gap
+    // (80-90 BPM matched no case in the published piecewise function).
+    anchor: { darkness: 0.5, intimacy: 0.5, motion: 0.4,
+      tempo: 0.45, onsetRate: 0.28, spectralFlux: 0.45 },
     techniques: ['MIRROR_DOUBLE_EXPOSURE'] },
   { id: 'motion_still_meditative', category: 'motion', tags: ['static', 'calm', 'serene'],
     fragment: 'complete stillness, a calm slow-exposure with the subject perfectly motionless',
-    anchor: { intimacy: 0.65, energy: 0.25, motion: 0.2 },
+    // Eq 2 Long-Exposure Static Glass: slow, sparse and spectrally static.
+    anchor: { intimacy: 0.65, energy: 0.25, motion: 0.2,
+      tempo: 0.15, onsetRate: 0.06, spectralFlux: 0.12 },
     techniques: ['MONUMENTAL_SCALE_ISOLATION', 'MACRO_INTIMATE_DETAIL'] },
 ]
 
@@ -209,14 +228,18 @@ const TEXTURE = [
     source: 'research: parental-advisory / mixtape xerox texture' },
   { id: 'tex_dust_scratches', category: 'texture', tags: ['dust', 'scratches', 'wear', 'analog'],
     fragment: 'subtle dust, hairline scratches and paper-tooth texture as if scanned from an old print',
-    // Module 3 #7 — Onset Density >12/sec 'floods the frame' with airborne dust and
-    // particulate. 0.55 on the normalised 0..25 scale = ~14 onsets/sec.
-    anchor: { acousticness: 0.65, warmth: 0.55, energy: 0.35, onsetRate: 0.55 },
+    // Module 3 #7 - high onset density floods the frame with airborne
+    // particulate. Calibrated to the MEASURED mean stroke density of dense hand
+    // percussion (10.62 onsets/sec, median 10.38, SD 3.9): 10.62/25 = 0.42.
+    // The previous 0.55 (13.75/sec) sat more than an SD above that mean, so
+    // almost no real track could reach it.
+    anchor: { acousticness: 0.65, warmth: 0.55, energy: 0.35, onsetRate: 0.42 },
     techniques: ['VINTAGE_FILM_NOSTALGIA'] },
   { id: 'tex_clean_detail', category: 'texture', tags: ['clean', 'detail', 'pores'],
     fragment: 'pristine sensor clarity resolving real un-airbrushed skin pores and textile weave',
-    // Module 3 #7 — Onset Density <2/sec produces 'hyper-clean, barren spaces'.
-    // 0.10 on the normalised 0..25 scale = ~2.5 onsets/sec.
+    // Module 3 #7 - low onset density produces hyper-clean, barren spaces.
+    // 0.10 = 2.5 onsets/sec, the published boundary between slow (0.2-2.5 Hz)
+    // and fast (>2.5 Hz) musical event rates.
     anchor: { brightness: 0.65, grit: 0.2, intimacy: 0.5, onsetRate: 0.10, spectralFlatness: 0.2 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'STUDIO_SEAMLESS_EDITORIAL'] },
 ]
