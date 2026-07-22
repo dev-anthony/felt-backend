@@ -123,38 +123,4 @@ const ART_MEDIUMS = [
     } },
 ]
 
-/**
- * Symbolism — emotional meaning attached to visual motifs. The DNA proposes a
- * motif; Gemini decides whether/how to stage it literally.
- * @type {import('../types').VocabularyConcept[]}
- */
-const SYMBOLISM = [
-  { id: 'sym_solar_halo', category: 'symbolism', tags: ['sun', 'halo', 'enlightenment', 'identity'],
-    fragment: 'a circular sun-like halo behind the head signalling identity, focus and self-possession',
-    anchor: { valence: 0.55, warmth: 0.6, intimacy: 0.5 },
-    source: 'research: orange sun-orb reference' },
-  { id: 'sym_monolith', category: 'symbolism', tags: ['monument', 'isolation', 'permanence'],
-    fragment: 'a single monolithic form slicing the horizon, standing for isolation and permanence',
-    anchor: { darkness: 0.55, intimacy: 0.4, energy: 0.35 },
-    techniques: ['MONUMENTAL_SCALE_ISOLATION'] },
-  { id: 'sym_piercing_object', category: 'symbolism', tags: ['conflict', 'pain', 'tension'],
-    fragment: 'a physical object interacting with the body under tension, standing for inner conflict',
-    anchor: { aggression: 0.6, darkness: 0.6, valence: 0.25 },
-    techniques: ['SURREAL_PRACTICAL_METAPHOR'] },
-  { id: 'sym_mirror_self', category: 'symbolism', tags: ['duality', 'reflection', 'self'],
-    fragment: 'a mirrored or doubled self standing for duality and self-confrontation',
-    anchor: { darkness: 0.5, intimacy: 0.5 },
-    techniques: ['MIRROR_DOUBLE_EXPOSURE'] },
-  { id: 'sym_open_road', category: 'symbolism', tags: ['freedom', 'journey', 'movement'],
-    fragment: 'an open road or horizon line standing for freedom and forward motion',
-    anchor: { motion: 0.55, valence: 0.55, warmth: 0.5 } },
-  { id: 'sym_warm_glow', category: 'symbolism', tags: ['desire', 'warmth', 'longing'],
-    fragment: 'a single warm glow in darkness standing for desire and longing without any second figure',
-    anchor: { warmth: 0.6, intimacy: 0.6, darkness: 0.5 },
-    techniques: ['DUOTONE_COLOR_WASH', 'MACRO_INTIMATE_DETAIL'] },
-  { id: 'sym_none', category: 'symbolism', tags: ['literal', 'no-metaphor'],
-    fragment: 'no added symbolic object — the emotion carried by light and posture alone',
-    anchor: { valence: 0.5, energy: 0.55, grit: 0.4 } },
-]
-
-module.exports = { SUBJECT_ARCHETYPES, EDITORIAL_STYLES, ART_MEDIUMS, SYMBOLISM }
+module.exports = { SUBJECT_ARCHETYPES, EDITORIAL_STYLES, ART_MEDIUMS }

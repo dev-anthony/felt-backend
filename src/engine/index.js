@@ -15,7 +15,7 @@
  */
 
 const { computeVisualDNA, orderedFragments, LAYERS } = require('./dna')
-const { assemblePrompt } = require('./assembler/promptAssembler')
+const { assemblePrompt, mediumFamily } = require('./assembler/promptAssembler')
 const { compileScene } = require('./compiler/geminiCompiler')
 const technique = require('./technique')
 const vocabulary = require('./vocabulary')
@@ -32,8 +32,8 @@ const DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE = 0.6
  * upstream) becomes the story; the DNA supplies every visual/technical block.
  * @returns {import('./types').AssembledPrompt}
  */
-function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna, noPeople = false }) {
-  const dna = providedDna || computeVisualDNA(features, techniqueName)
+function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna, noPeople = false, mediumFamily }) {
+  const dna = providedDna || computeVisualDNA(features, techniqueName, { mediumFamily })
   // The scene sentence already contains the subject AND the setting (it is the
   // whole story), so we do NOT inject the DNA subject archetype — doing so would
   // describe two different people in one prompt. The DNA supplies only the look.
@@ -80,6 +80,7 @@ async function orchestrate({ generate, features, techniqueName, userFeeling, lyr
 }
 
 module.exports = {
+  mediumFamily,
   // high-level
   computeVisualDNA,
   assembleFromScene,

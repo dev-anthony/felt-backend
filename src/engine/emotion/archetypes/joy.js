@@ -10,7 +10,16 @@ module.exports = {
   label: 'Joyful Activation, Whimsy & Playfulness',
   genres: 'Pop, funk, indie pop, calypso, ska, disco',
   register: 'exuberance and lightness — bouncing, open, unselfconscious',
-  anchor: { euphoria: 0.8, valence: 0.85, brightness: 0.75, tempo: 0.6, danceability: 0.7, scaleMajor: 1 },
+  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
+  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
+  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
+  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
+  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
+  // rather than expressive, and uniformly penalised its archetype. Rescaled
+  // linearly: every archetype keeps its exact position relative to the others,
+  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
+  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
+  anchor: { euphoria: 0.8, valence: 0.781, brightness: 0.75, tempo: 0.6, danceability: 0.7, scaleMajor: 1 },
   motionBias: 0.75,
   states: {
     normal: {

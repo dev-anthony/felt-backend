@@ -16,7 +16,8 @@
 
 const { buildFeatureVector, dspDims } = require('./featureVector')
 const { selectConcept } = require('./scoring')
-const { getCategory } = require('../vocabulary')
+const { getCategory, getConcept } = require('../vocabulary')
+const { conceptMediumFamily } = require('../assembler/promptAssembler')
 const { applyTechniqueBias, getAffinity, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
 // Safe require order: emotion/index pulls in dna/scoring only, never dna/index,
 // so this is a tree rather than a cycle.
@@ -83,7 +84,7 @@ function applyBias(vector, bias) {
   return out
 }
 
-function computeVisualDNA(rawFeatures, techniqueName) {
+function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
   const technique = isValidTechnique(techniqueName) ? techniqueName : DEFAULT_TECHNIQUE
   const vector = buildFeatureVector(rawFeatures)
 
@@ -123,9 +124,21 @@ function computeVisualDNA(rawFeatures, techniqueName) {
     // same technique still diverge. Layers with no affinity (subject,
     // environment, artMedium, graphic, typography) score freely as before.
     const shortlist = getAffinity(technique, layer.key)
-    const candidates = shortlist.length
+    let candidates = shortlist.length
       ? all.filter((c) => shortlist.includes(c.id))
       : all
+
+    // MEDIUM AGREEMENT.
+    // The scene is written BEFORE the technique is known, so it has already
+    // committed to a medium family ("you write ONE rendered moment"). If the
+    // per-technique scoring here then picked a different family, the prompt
+    // would describe a photograph and label it a 3D render — the exact
+    // contradiction this constraint exists to prevent. When the caller states
+    // the family the scene was written for, the medium layer must stay inside it.
+    if (layer.key === 'artMedium' && opts.mediumFamily) {
+      const inFamily = candidates.filter((c) => conceptMediumFamily(c) === opts.mediumFamily)
+      if (inFamily.length) candidates = inFamily
+    }
 
     const { selection } = selectConcept(candidates.length ? candidates : all, biased, {
       technique,
@@ -136,6 +149,17 @@ function computeVisualDNA(rawFeatures, techniqueName) {
     const chosen = selection || fallbackSelection(layer)
     chosen.layer = layer.key
     chosen.priority = layer.priority
+
+    // STATE-AWARE STAGING.
+    // A symbol carries one meaning but is a different physical object in a
+    // different world — the open road is a coastal highway from a supercar in
+    // Luxury and a cracked two-lane with weeds through it in Gritty. Concepts
+    // that declare `staging` resolve their fragment from the aesthetic state the
+    // emotion layer just read, exactly as an archetype resolves its cell.
+    // Concepts without `staging` are untouched.
+    const concept = getConcept(chosen.conceptId)
+    const staged = concept && concept.staging && concept.staging[emotion.state]
+    if (staged) chosen.fragment = staged
 
     selections[layer.key] = chosen
     fragments[layer.key] = chosen.fragment

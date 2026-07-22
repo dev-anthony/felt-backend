@@ -79,11 +79,74 @@ function deserializeBrief(stored) {
   return { technique: DEFAULT_TECHNIQUE, scene: stored, structured: false }
 }
 
-const AESTHETIC_SYSTEM_PROMPT = `You are the art director for a real recording artist's single cover. You write ONE photographic moment. You do not write poetry, mood boards, or explanations.
+const PERSON_SUBJECT_BLOCK = `SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
+- DECIDE WHO belongs here — never default to a young woman. From the genre, register and lyrics choose gender, an age that fits (a child, a teenager, someone in their 20s-40s, an elder), build and cultural context. Men, women, children, elders and unconventional-looking people all belong. Vary this every time.
+- ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
+- SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
+- ONE or TWO distinctive markers so they look like SOMEBODY: a lined fade, box braids, locs, a durag, grey hair, a gap or gold tooth, a nose ring, a face or hand tattoo, expressive makeup, cultural jewellery, a signature hat.
+- WARDROBE WITH WEIGHT: name the garment AND how the fabric behaves under gravity — "a heavy structured wool coat cinched at the waist, pooling over the hips", not "a red dress"; "an oversized drop-shoulder hoodie stacking sharply at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
+- Keep the person to a few vivid concrete facts. Do not list every feature — leave room for the world and the action.
+- BANNED words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish".
+- The face is LIT and clearly visible. Never describe it as shadowed, hidden, obscured or turned away UNLESS the technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION.`
+
+const ABSENT_SUBJECT_BLOCK = `OBJECT / ABSTRACT CONSTRUCTION (this cover has NO human figure — that is deliberate):
+- The Visual DNA has determined this song is carried by a thing, a place or a material rather than a person. Do not add a figure, a silhouette, a pair of hands or a body part at the frame's edge. Nobody is in this picture.
+- Choose ONE concrete subject and commit to it entirely: a single object loaded with the song's meaning, one material caught in a specific state, or one structure. It must be specific and nameable — "a cracked terrazzo stairwell", "a half-drunk glass of palm wine going warm", "a coil of magnetic tape pulled out of its shell" — never "an object" or "a texture".
+- Give it PHYSICALITY: what it is made of, how it has been used, what time has done to it. Chips, wear, fingerprints, dust, condensation, heat damage, repair. An object with no history reads as stock.
+- Give it SCALE and PLACEMENT: whether we are inches from it or across a room, and what it sits on or in. Emptiness around it is a decision, not an absence.
+- Give it a MOMENT: even without a person something is happening — steam still rising, liquid still moving, dust still falling, light crossing it as it shifts. A dead still-life is the failure mode here, exactly as a static portrait is in the human version.
+- BANNED words: "beautiful", "stunning", "ethereal", "abstract shapes", "an object", "a surface", "some kind of", "mysterious".`
+
+/**
+ * The scene-writer's system prompt.
+ *
+ * Built per request rather than fixed, because two decisions the Visual DNA has
+ * already made change what a good scene even IS:
+ *
+ *   mediumFamily — a cover destined for a 3D render or a printed illustration
+ *     should not be written as a photograph. The old fixed prompt opened with
+ *     "you write ONE photographic moment" regardless, so a CGI track got a
+ *     photographic scene welded to a "hyper-glossy 3D render" medium fragment:
+ *     two mediums in one prompt.
+ *
+ *   subjectMode — the DNA selects `subj_absent` ("no human figure at all") on
+ *     roughly 9% of tracks, and Module 1's upper-intensity cells are frequently
+ *     objects or abstractions ("macro technical framing inside a luxury watch
+ *     movement", "elimination of literal physical assets"). The fixed prompt
+ *     demanded a person every time, so those cells were unreachable and
+ *     `subj_absent` was effectively dead. This swaps in an object/abstract
+ *     construction block of equal rigour instead.
+ *
+ * Only the DNA's own signal may trigger `absent` — never a general licence.
+ * A faceless abstract cover is right for a Cerebral IDM record and wrong for an
+ * Afrobeats single, and the DNA already encodes that difference.
+ */
+const MEDIUM_BRIEF = {
+  photo: {
+    opener: 'You write ONE photographic moment.',
+    execution: 'photography',
+    forbid: 'cameras, lenses, film stock, lighting, shadows, rim light, colour grade, hue, grain, exposure, vignette or post-processing',
+  },
+  cgi: {
+    opener: 'You write ONE rendered moment. This cover will be BUILT as a 3D render, not photographed — so think in surfaces, materials and constructed space, not in what a camera happened to catch.',
+    execution: 'rendering',
+    forbid: 'cameras, lenses, film stock, render engines, shaders, ray-tracing, subsurface scattering, lighting rigs, colour grade or post-processing',
+  },
+  illustration: {
+    opener: 'You write ONE illustrated moment. This cover will be DRAWN and printed, not photographed — so think in shapes, gesture and graphic clarity, not in optical accident.',
+    execution: 'illustration',
+    forbid: 'cameras, lenses, film stock, ink weights, screentone, halftone, print texture, colour grade or post-processing',
+  },
+}
+
+function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person' } = {}) {
+  const M = MEDIUM_BRIEF[mediumFamily] || MEDIUM_BRIEF.photo
+  const subjectBlock = subjectMode === 'absent' ? ABSENT_SUBJECT_BLOCK : PERSON_SUBJECT_BLOCK
+  return `You are the art director for a real recording artist's single cover. ${M.opener} You do not write poetry, mood boards, or explanations.
 
 Everything you write must serve one goal: someone who has heard this song should look at the cover and recognise it. Not "a nice image" — THIS song's image.
 
-An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. It is the single most important input you receive. Read it first and let it govern the entire frame — the register, the aesthetic world, the intensity tier, and above all the MOVEMENT line.
+An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. It is the single most important input you receive. Read it first and let it govern the entire frame — the register, the aesthetic world, the intensity tier, the MOVEMENT line, and above all the VISUAL DIRECTION line.\n- VISUAL DIRECTION is the distilled result of a twelve-archetype x three-world x four-intensity matrix built from music-psychology research. It names the lighting, palette, composition and texture this exact combination calls for. Treat it as the brief, not as a suggestion: your scene must be a place and a moment where that direction is what would naturally be seen.\n- If VISUAL DIRECTION describes an object, a material or an abstraction rather than a person, follow it there. Do not force a human figure into it.
 
 TECHNIQUE LIBRARY — choose exactly ONE, matched to the emotional register:
 
@@ -125,15 +188,7 @@ BANNED POSES — these have become defaults and are now forbidden unless the bri
 - standing motionless facing the camera with arms at sides
 If your instinct produces one of these, discard it and write an action instead.
 
-SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
-- DECIDE WHO belongs here — never default to a young woman. From the genre, register and lyrics choose gender, an age that fits (a child, a teenager, someone in their 20s-40s, an elder), build and cultural context. Men, women, children, elders and unconventional-looking people all belong. Vary this every time.
-- ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
-- SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
-- ONE or TWO distinctive markers so they look like SOMEBODY: a lined fade, box braids, locs, a durag, grey hair, a gap or gold tooth, a nose ring, a face or hand tattoo, expressive makeup, cultural jewellery, a signature hat.
-- WARDROBE WITH WEIGHT: name the garment AND how the fabric behaves under gravity — "a heavy structured wool coat cinched at the waist, pooling over the hips", not "a red dress"; "an oversized drop-shoulder hoodie stacking sharply at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
-- Keep the person to a few vivid concrete facts. Do not list every feature — leave room for the world and the action.
-- BANNED words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish".
-- The face is LIT and clearly visible. Never describe it as shadowed, hidden, obscured or turned away UNLESS the technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION.
+${subjectBlock}
 
 ENVIRONMENT & MOMENT (a cover is a PLACE and a MOMENT, not a floating portrait):
 - ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor". Name it: a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party.
@@ -148,14 +203,66 @@ SUBJECT COUNT (safety):
 - Never depict two people embracing, kissing, or in romantic or sexual physical contact, regardless of how romantic the lyrics are. Use the CONNECTION techniques above instead — motion, implication, a charged environment, a hand at the frame's edge. Those are not consolation prizes; they are the stronger image.
 
 STORY-ONLY RULE:
-- You write the STORY, never the photography. Describe only: who is in frame, where they are, what they are physically doing, their expression and posture, and at most ONE symbolic object.
-- Do NOT mention cameras, lenses, film stock, lighting, shadows, rim light, colour grade, hue, grain, exposure, vignette or post-processing. A separate system decides every one of those; naming them here corrupts the result.
+- You write the STORY, never the ${M.execution}. Describe only: what is in frame, where it is, what is physically happening, and at most ONE symbolic object.
+- Do NOT mention ${M.forbid}. A separate system decides every one of those; naming them here corrupts the result.
 - Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy".
 
 OUTPUT FORMAT (CRITICAL):
 Respond with exactly two lines, nothing else:
 TECHNIQUE: <one of the 10 technique names above, exact match>
-SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`;
+SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`
+}
+
+/**
+ * Ask the Visual DNA, before the scene is written, which medium this cover will
+ * be executed in and whether it has a human subject at all.
+ *
+ * Ordering note: Gemini picks the technique, and computeVisualDNA needs one — so
+ * this has to answer before the technique exists. It does NOT assume a default.
+ * An earlier version previewed with DEFAULT_TECHNIQUE and was wrong: medium is
+ * not technique-independent (medium_photography carries a technique bonus, and
+ * applyTechniqueBias shifts the vector differently per technique), so a CGI-
+ * bound industrial track read as photographic purely because the default
+ * happened to be DUOTONE_COLOR_WASH.
+ *
+ * Instead we marginalise over all ten techniques and take the modal answer:
+ * "which medium does this track land in most often, whatever Gemini picks?"
+ * Ten DNA passes cost well under a millisecond, and the real DNA is still
+ * computed properly afterwards from the technique Gemini actually chose.
+ *
+ * Best-effort: any failure returns the previous behaviour (photographic, with a
+ * person), so a fault here can never block a generation.
+ */
+function deriveSceneMode(features) {
+  try {
+    const mediums = {}
+    const subjects = {}
+    for (const t of Object.keys(engine.technique.TECHNIQUES)) {
+      const dna = engine.computeVisualDNA(features, t)
+      const fam = engine.mediumFamily(dna)
+      mediums[fam] = (mediums[fam] || 0) + 1
+      const sub = dna.selections.subject.conceptId === 'subj_absent' ? 'absent' : 'person'
+      subjects[sub] = (subjects[sub] || 0) + 1
+    }
+    // Photography is FELT's default thesis, so a non-photo medium needs a clear
+    // MAJORITY, not a plurality. A 4/3/3 split is an ambiguous track, and
+    // committing the scene writer to "you write ONE rendered moment" on a
+    // one-technique edge would be a coin flip with a very visible outcome.
+    const total = Object.values(mediums).reduce((a, b) => a + b, 0)
+    const top = Object.entries(mediums).sort((a, b) => b[1] - a[1])[0]
+    const decisive = top && top[1] > total / 2 ? top[0] : 'photo'
+    return {
+      mediumFamily: decisive,
+      // A person is the safe default, so `absent` must win outright rather than
+      // merely tie — a faceless cover is right for a Cerebral IDM record and
+      // wrong for an Afrobeats single.
+      subjectMode: (subjects.absent || 0) > (subjects.person || 0) ? 'absent' : 'person',
+    }
+  } catch (err) {
+    console.warn(`[SCENE MODE] falling back to photo/person: ${err?.message || err}`)
+    return { mediumFamily: 'photo', subjectMode: 'person' }
+  }
+}
 
 function parseSceneResponse(rawText, fallbackScene) {
   const text = (rawText || '').trim()
@@ -177,7 +284,7 @@ function buildFluxPrompt(technique, scene) {
   return `${scene}. ${suffix} Definitively moody, intentional, and authentic — zero digital smoothing, zero CGI artifacts, zero plastic AI skin.`
 }
 
-async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false } = {}) {
+async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false, mediumFamily } = {}) {
   try {
     if (useCompiler) {
       const result = await engine.orchestrate({
@@ -192,7 +299,7 @@ async function buildFinalPrompt(technique, scene, features, { useCompiler = fals
       })
       return { prompt: result.prompt, technique: result.technique, dna: result.dna }
     }
-    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene, noPeople })
+    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene, noPeople, mediumFamily })
     return { prompt: built.prompt, technique: built.technique, dna: built.dna }
   } catch (err) {
     console.warn(`[ENGINE] Visual DNA build failed, using legacy prompt: ${err?.message || err}`)
@@ -270,8 +377,8 @@ async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '
   throw lastErr
 }
 
-async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext }) {
-  const promptText = `${AESTHETIC_SYSTEM_PROMPT}
+async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext, features }) {
+  const promptText = `${aestheticSystemPrompt(deriveSceneMode(features))}
 
 ${emotionalRegister2 ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister2}
@@ -370,7 +477,7 @@ router.post('/expand', requireAuth, async (req, res) => {
 
     const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input)
 
-    const promptText = `${AESTHETIC_SYSTEM_PROMPT}
+    const promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -534,7 +641,7 @@ router.post('/transcribe', requireAuth, async (req, res) => {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
       const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput)
-      promptText = `${AESTHETIC_SYSTEM_PROMPT}
+      promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -548,7 +655,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
       const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`)
-      promptText = `${AESTHETIC_SYSTEM_PROMPT}
+      promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
@@ -652,11 +759,15 @@ router.post('/', requireAuth, async (req, res) => {
           lyrics: '',
           sonicFeatures: trackSonicFeatures,
           artistContext: `${artistProfile.city || 'Unknown Space'} (${artistProfile.sound_words || 'Raw Collective'})`,
+          features: upload.audio_features,
         }))
       }
     }
 
     const { prompt: absoluteFluxPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+      // Same family the scene writer was briefed on, so the assembled
+      // medium can never contradict the scene text.
+      mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
       useCompiler: req.body.use_compiler === true,
       mood: upload.audio_features?.mood,
       noPeople: artistNoPeople,
@@ -782,7 +893,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
       genreLineage(refineProfile.default_genre)
     );
 
-    const refinementPrompt = `${AESTHETIC_SYSTEM_PROMPT}
+    const refinementPrompt = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
 ${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
 You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — keep the same technique unless the request clearly demands a different one.
 
@@ -804,6 +915,9 @@ INPUT REFINEMENT VARIABLES:
     }
 
     const { prompt: absoluteFluxRefinedPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+      // Same family the scene writer was briefed on, so the assembled
+      // medium can never contradict the scene text.
+      mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
       useCompiler: req.body.use_compiler === true,
       mood: upload.audio_features?.mood,
       noPeople: refineNoPeople,
@@ -876,3 +990,8 @@ INPUT REFINEMENT VARIABLES:
 });
 
 module.exports = router;
+
+// Exported for tests: the scene prompt is now conditional, so its branching is
+// worth asserting directly rather than only observing through a live Gemini call.
+module.exports.aestheticSystemPrompt = aestheticSystemPrompt
+module.exports.deriveSceneMode = deriveSceneMode

@@ -14,6 +14,7 @@
 const photo = require('./photography')
 const design = require('./design')
 const creative = require('./creative')
+const symbolism = require('./symbolism')
 
 /** category → concept[] */
 const VOCABULARY = {
@@ -32,7 +33,7 @@ const VOCABULARY = {
   subject: creative.SUBJECT_ARCHETYPES,
   editorial: creative.EDITORIAL_STYLES,
   artMedium: creative.ART_MEDIUMS,
-  symbolism: creative.SYMBOLISM,
+  symbolism: symbolism.SYMBOLISM,
 }
 
 // Flat id → concept index across all categories.

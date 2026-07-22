@@ -31,6 +31,15 @@ const MEDIUM_FAMILY_TAGS = {
     'illustration', 'print', 'cel-shaded', 'anime', 'comic'],
 }
 
+/** Family of a single artMedium concept. */
+function conceptMediumFamily(concept) {
+  const tags = (concept && concept.tags) || []
+  if (tags.includes('photo') || tags.includes('default')) return 'photo'
+  if (tags.some((t) => MEDIUM_FAMILY_TAGS.cgi.includes(t))) return 'cgi'
+  if (tags.some((t) => MEDIUM_FAMILY_TAGS.illustration.includes(t))) return 'illustration'
+  return 'photo'
+}
+
 /** @returns {'photo'|'cgi'|'illustration'} */
 function mediumFamily(dna) {
   const sel = dna.selections.artMedium
@@ -154,4 +163,4 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
   return { prompt, technique, dna, scene: b }
 }
 
-module.exports = { assemblePrompt }
+module.exports = { assemblePrompt, mediumFamily, conceptMediumFamily }

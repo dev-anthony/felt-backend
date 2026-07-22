@@ -14,7 +14,19 @@
  * Node 18+ global fetch is assumed (the project runs Node 22).
  */
 
-const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'gemini').toLowerCase()
+// Measured on this account (July 2026), not assumed:
+//   gemini-2.5-flash-image      -> free-tier quota `limit: 0`
+//   gemini-3.1-flash-image      -> free-tier quota `limit: 0`
+//   replicate flux-schnell      -> 402 Insufficient credit
+//   huggingface                 -> Inference-Provider credits depleted
+//   together FLUX.1-schnell-Free-> genuine free tier, needs TOGETHER_API_KEY
+//   pollinations                -> works, no key
+//
+// Defaulting to `gemini` meant EVERY generation made a doomed API call, waited
+// for the 429, and only then fell back — a wasted round-trip on every cover.
+// Default to a provider that actually answers. Set IMAGE_PROVIDER=gemini (or
+// =replicate) the moment billing is enabled; nothing else needs to change.
+const DEFAULT_PROVIDER = (process.env.IMAGE_PROVIDER || 'pollinations').toLowerCase()
 
 // Some providers pass the prompt in the URL (Pollinations) and can 414 on very
 // long prompts. The Visual DNA + Reality prompt is intentionally rich (~2k
@@ -32,7 +44,22 @@ async function viaPollinations(prompt, { width, height, seed }) {
     width: String(width),
     height: String(height),
     nologo: 'true',
-    model: 'flux',
+    // GET https://image.pollinations.ai/models currently returns ["sana"] — the
+    // FLUX endpoint is no longer offered, so this parameter is advisory and the
+    // service picks its own model. Left configurable so we pick FLUX back up
+    // automatically if it returns. Sana is markedly weaker at photorealism than
+    // FLUX, which is the real ceiling on output quality right now.
+    model: process.env.POLLINATIONS_MODEL || 'flux',
+    // Pollinations can run the prompt through an LLM "enhancer" that rewrites
+    // it. FELT's prompt is the assembled output of the Visual DNA, technique
+    // suffix and Reality Engine — letting a third-party model paraphrase it
+    // discards that work and reintroduces the generic-AI-art look the whole
+    // engine exists to avoid. Opt out explicitly.
+    enhance: 'false',
+    // Keep generated covers out of the public feed; these are artists' unreleased
+    // records, and the prompt text itself is proprietary.
+    nofeed: 'true',
+    private: 'true',
   })
   if (seed != null) params.set('seed', String(seed))
   const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?${params.toString()}`
@@ -121,12 +148,23 @@ async function viaGemini(prompt, { width, height }) {
     const { GoogleGenAI } = require('@google/genai')
     _genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   }
-  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image'
-  // Gemini image models take the aspect ratio as language, not pixel dimensions.
-  const ratio = width === height ? '1:1 square' : `${width}x${height}`
+  // Both 2.5 and 3.1 image models report free-tier `limit: 0` on this key, so
+  // neither is "the free one" — the choice only matters once billing is on.
+  // 2.5-flash-image is the cheaper of the two, so it is the default.
+  const model = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
+  const ratio = width === height ? '1:1' : `${width}:${height}`
   const res = await _genai.models.generateContent({
     model,
     contents: `${prompt}\n\nOutput a single ${ratio} photographic image.`,
+    config: {
+      // Without this a multimodal model may answer with a text DESCRIPTION of
+      // the image instead of generating one — which surfaced here as the
+      // confusing "Gemini returned no image" error below.
+      responseModalities: ['Image'],
+      // Structured aspect ratio. The prompt sentence above is kept as a
+      // belt-and-braces hint, but this is the field the API actually honours.
+      imageConfig: { aspectRatio: ratio },
+    },
   })
   const parts = res?.candidates?.[0]?.content?.parts || []
   const img = parts.find((p) => p.inlineData?.data)
@@ -148,7 +186,13 @@ const PROVIDERS = {
 
 // Providers to fall back to, in order, when the primary fails for a reason that
 // retrying won't fix (exhausted quota / missing billing / missing key).
-const FALLBACK_CHAIN = ['pollinations']
+// Ordered best-available-first. `together` sits ahead of `pollinations` because
+// FLUX.1-schnell-Free is real FLUX on a genuine free tier — strictly better
+// output than Pollinations' current Sana model — and it costs nothing but a
+// signup. It is skipped automatically while TOGETHER_API_KEY is unset (the
+// provider throws immediately, which `isUnrecoverable` catches), so adding the
+// key is the only step needed to upgrade every cover.
+const FALLBACK_CHAIN = ['together', 'pollinations']
 const isUnrecoverable = (msg) =>
   /quota|limit: 0|RESOURCE_EXHAUSTED|billing|depleted|not set|permission|401|402|403|429/i.test(msg)
 

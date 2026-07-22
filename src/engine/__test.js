@@ -15,9 +15,9 @@ const { readEmotion, emotionalRegisterBlock } = require('./emotion')
 const { buildFeatureVector, sanitizeVector, dspDims, FEATURE_KEYS, DSP_KEYS } = require('./dna/featureVector')
 const { anchorScore } = require('./dna/scoring')
 const { computeVisualDNA } = require('./dna')
-const { assemblePrompt } = require('./assembler/promptAssembler')
+const { assemblePrompt, mediumFamily } = require('./assembler/promptAssembler')
 const { TECHNIQUES, getAffinity, DEFAULT_TECHNIQUE } = require('./technique')
-const { getCategory } = require('./vocabulary')
+const { getCategory, getConcept } = require('./vocabulary')
 
 let passed = 0
 const failures = []
@@ -386,6 +386,157 @@ test('bias application never pushes a dimension outside 0..1', () => {
       assert.ok(c.confidence >= 0 && c.confidence <= 1, `${layer} confidence out of range`)
     }
   }
+})
+
+// ── 13. Symbolism library ─────────────────────────────────────────────────
+test('every symbol is fully specified', () => {
+  const states = Object.keys(AESTHETIC_STATES)
+  for (const s of getCategory('symbolism')) {
+    for (const f of ['label', 'meaning', 'lineage', 'scope', 'staging', 'fragment']) {
+      assert.ok(s[f], `${s.id} missing "${f}"`)
+    }
+    assert.ok(Array.isArray(s.archetypes), `${s.id}.archetypes is not an array`)
+    assert.ok(['universal', 'cultural'].includes(s.scope), `${s.id} bad scope "${s.scope}"`)
+    for (const st of states) {
+      assert.ok(typeof s.staging[st] === 'string' && s.staging[st].trim(),
+        `${s.id} has no "${st}" staging`)
+    }
+  }
+})
+
+test('every archetype a symbol claims actually exists', () => {
+  const ids = new Set(Object.keys(ARCHETYPES))
+  for (const s of getCategory('symbolism')) {
+    for (const a of s.archetypes) assert.ok(ids.has(a), `${s.id} claims unknown archetype "${a}"`)
+  }
+})
+
+test('all 12 archetypes have symbolic coverage', () => {
+  const covered = new Set()
+  for (const s of getCategory('symbolism')) for (const a of s.archetypes) covered.add(a)
+  for (const a of Object.keys(ARCHETYPES)) {
+    assert.ok(covered.has(a), `archetype ${a} has no symbol serving it`)
+  }
+})
+
+test('symbol staging text is unique per state (no copy-paste)', () => {
+  for (const s of getCategory('symbolism')) {
+    if (s.id === 'sym_none') continue // intentionally identical: it is the absence of a motif
+    const vals = Object.values(s.staging)
+    assert.strictEqual(new Set(vals).size, vals.length, `${s.id} repeats a staging across states`)
+  }
+})
+
+test('symbol fragment resolves from the aesthetic state', () => {
+  const base = {
+    bpm: 100, energy: 60, valence: 45, danceability: 55, acousticness: 40,
+    spectral_brightness: 50, speechiness: 20, loudness: -10, key: 'C', scale: 'minor',
+  }
+  const luxury = computeVisualDNA(
+    { ...base, spectral_brightness: 88, loudness: -3, speechiness: 2, acousticness: 30 },
+    'SURREAL_PRACTICAL_METAPHOR')
+  const gritty = computeVisualDNA(
+    { ...base, speechiness: 92, acousticness: 3, energy: 95, loudness: -4 },
+    'SURREAL_PRACTICAL_METAPHOR')
+  const lc = getConcept(luxury.selections.symbolism.conceptId)
+  const gc = getConcept(gritty.selections.symbolism.conceptId)
+  assert.strictEqual(luxury.selections.symbolism.fragment, lc.staging.luxury)
+  assert.strictEqual(gritty.selections.symbolism.fragment, gc.staging.gritty)
+})
+
+test('a staged symbol reaches the assembled prompt', () => {
+  const dna = computeVisualDNA({ ...TRACK, ...DSP }, 'SURREAL_PRACTICAL_METAPHOR')
+  const { prompt } = assemblePrompt({
+    blueprint: { subject: 'a lone figure', environment: 'a rain-slick street', sceneAction: 'standing still' },
+    dna, symbolismMinConfidence: 0,
+  })
+  const frag = dna.selections.symbolism.fragment
+  if (dna.selections.symbolism.conceptId !== 'sym_none') {
+    assert.ok(prompt.includes(frag.slice(0, 40)), 'staged symbol did not reach the prompt')
+  }
+})
+
+// ── 14. DEAM calibration ──────────────────────────────────────────────────
+// Measured on DEAM (1,802 human-rated songs): 95% of real music sits inside
+// valence 0.195..0.781 and arousal 0.156..0.797. FELT's own valence formula can
+// only emit 0.174..0.875. An anchor outside that band is not "more extreme" —
+// it is unreachable, and it uniformly penalises its archetype against every
+// track. These bounds guard against re-introducing that by hand.
+const DEAM_VALENCE = [0.195, 0.781]
+const DEAM_AROUSAL = [0.156, 0.797]
+
+test('no archetype anchors outside the measured range of real music', () => {
+  for (const [k, a] of Object.entries(ARCHETYPES)) {
+    if (a.anchor.valence !== undefined) {
+      const v = a.anchor.valence
+      assert.ok(v >= DEAM_VALENCE[0] - 1e-9 && v <= DEAM_VALENCE[1] + 1e-9,
+        `${k} valence ${v} is outside DEAM's measured ${DEAM_VALENCE.join('..')}`)
+    }
+    if (a.anchor.energy !== undefined) {
+      const e = a.anchor.energy
+      assert.ok(e >= DEAM_AROUSAL[0] - 1e-9 && e <= DEAM_AROUSAL[1] + 1e-9,
+        `${k} energy ${e} is outside DEAM's measured ${DEAM_AROUSAL.join('..')}`)
+    }
+  }
+})
+
+test('calibration preserved the emotional ordering of the archetypes', () => {
+  // The rescale was linear, so relative position must be unchanged. Melancholy
+  // and Dread stay the bleakest; Joy the brightest; Serenity the calmest and
+  // Power the most forceful. If a future edit reorders these, the taxonomy has
+  // drifted from the research and this fails.
+  const val = (k) => ARCHETYPES[k].anchor.valence
+  const eng = (k) => ARCHETYPES[k].anchor.energy
+  assert.ok(val('DREAD') < val('MELANCHOLY'), 'Dread should read bleaker than Melancholy')
+  assert.ok(val('MELANCHOLY') < val('POWER'), 'Melancholy should read bleaker than Power')
+  assert.ok(val('POWER') < val('TENSION'), 'Power should read darker than Tension')
+  assert.ok(val('TENSION') < val('CEREBRAL'), 'Tension should read darker than Cerebral')
+  assert.ok(val('CEREBRAL') < val('NOSTALGIA'), 'Cerebral should read darker than Nostalgia')
+  assert.ok(val('NOSTALGIA') < val('TENDERNESS'), 'Nostalgia should read darker than Tenderness')
+  assert.ok(val('TENDERNESS') < val('TRANSCENDENCE'), 'Tenderness below Transcendence')
+  assert.ok(val('TRANSCENDENCE') < val('JOY'), 'Joy should be the brightest')
+  assert.ok(eng('SERENITY') < eng('MELANCHOLY'), 'Serenity should be the stillest')
+  assert.ok(eng('EUPHORIA') < eng('POWER'), 'Power should be the most forceful')
+})
+
+// ── 15. Medium agreement between scene and assembly ───────────────────────
+// The scene is written BEFORE the technique is known, so it commits to a medium
+// family up front ("you write ONE rendered moment"). If per-technique scoring
+// then picked a different family, the prompt would describe a photograph and
+// label it a 3D render. The constraint below is what makes that impossible.
+test('computeVisualDNA honours a medium-family constraint', () => {
+  const cgiTrack = {
+    bpm: 130, energy: 82, valence: 50, danceability: 55, acousticness: 6,
+    spectral_brightness: 80, speechiness: 15, loudness: -4, scale: 'minor',
+    sub_bass_ratio: 0.48, spectral_flatness: 0.10, spectral_flux: 0.5, onset_rate: 7,
+  }
+  for (const family of ['photo', 'cgi', 'illustration']) {
+    for (const t of Object.keys(TECHNIQUES)) {
+      const dna = computeVisualDNA(cgiTrack, t, { mediumFamily: family })
+      assert.strictEqual(mediumFamily(dna), family,
+        `${t}: asked for "${family}" but assembled "${mediumFamily(dna)}"`)
+    }
+  }
+})
+
+test('a medium constraint never empties the selection', () => {
+  for (const family of ['photo', 'cgi', 'illustration']) {
+    const dna = computeVisualDNA(TRACK, DEFAULT_TECHNIQUE, { mediumFamily: family })
+    assert.ok(dna.selections.artMedium && dna.selections.artMedium.conceptId,
+      `${family} produced no artMedium`)
+    assert.ok(dna.selections.artMedium.fragment, `${family} produced an empty fragment`)
+  }
+})
+
+test('an unknown medium family degrades instead of breaking', () => {
+  const dna = computeVisualDNA(TRACK, DEFAULT_TECHNIQUE, { mediumFamily: 'hologram' })
+  assert.ok(dna.selections.artMedium.conceptId, 'unknown family should fall through, not crash')
+})
+
+test('constraining the medium leaves the rest of the DNA deterministic', () => {
+  const a = computeVisualDNA(TRACK, DEFAULT_TECHNIQUE, { mediumFamily: 'photo' })
+  const b = computeVisualDNA(TRACK, DEFAULT_TECHNIQUE, { mediumFamily: 'photo' })
+  assert.strictEqual(JSON.stringify(a.selections), JSON.stringify(b.selections))
 })
 
 // ── report ────────────────────────────────────────────────────────────────

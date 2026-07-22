@@ -10,7 +10,16 @@ module.exports = {
   label: 'Cerebral, Complex & Analytical',
   genres: 'IDM, avant-garde jazz, math rock, glitch, microtonal, progressive',
   register: 'cold fascination and precision — detached, structural, exacting',
-  anchor: { brightness: 0.8, acousticness: 0.2, valence: 0.4, energy: 0.5, danceability: 0.35 },
+  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
+  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
+  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
+  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
+  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
+  // rather than expressive, and uniformly penalised its archetype. Rescaled
+  // linearly: every archetype keeps its exact position relative to the others,
+  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
+  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
+  anchor: { brightness: 0.8, acousticness: 0.2, valence: 0.438, energy: 0.464, danceability: 0.35 },
   motionBias: 0.3,
   states: {
     normal: {
