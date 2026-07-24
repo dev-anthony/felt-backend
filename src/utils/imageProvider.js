@@ -218,7 +218,7 @@ const PROVIDERS = {
 // signup. It is skipped automatically while TOGETHER_API_KEY is unset (the
 // provider throws immediately, which `isUnrecoverable` catches), so adding the
 // key is the only step needed to upgrade every cover.
-const FALLBACK_CHAIN = ['cloudflare', 'together'] //remeber to add 'pollinations' if you want it as a fallback
+const FALLBACK_CHAIN = ['cloudflare', 'pollinations'] //remeber to add 'pollinations' if you want it as a fallback
 const isUnrecoverable = (msg) =>
   /quota|limit: 0|RESOURCE_EXHAUSTED|billing|depleted|not set|permission|401|402|403|429/i.test(msg)
 
