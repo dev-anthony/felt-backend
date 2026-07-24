@@ -5,14 +5,14 @@
  * One entrypoint — generateImage(prompt, { width, height, seed }) — that returns
  * a base64 `data:` URL, so the caller's Cloudinary upload stays unchanged.
  * Which backend runs is chosen by IMAGE_PROVIDER (default: 'pollinations').
- *
- *   pollinations  FREE, no key, no signup. FLUX-based. Great for testing.
+*   pollinations  FREE, no key, no signup. Currently Sana-based (FLUX gone). Great for testing.
  *   together      FREE tier (FLUX.1-schnell-Free). Needs TOGETHER_API_KEY.
  *   huggingface   Paid Inference Providers credits. Needs HF_TOKEN.
  *   replicate     Pay-as-you-go. Needs REPLICATE_API_TOKEN.
- *
- * Node 18+ global fetch is assumed (the project runs Node 22).
+ *   cloudflare    FREE daily Neuron pool (Leonardo Phoenix/Lucid Origin). Needs CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN.
  */
+
+
 
 // Measured on this account (July 2026), not assumed:
 //   gemini-2.5-flash-image      -> free-tier quota `limit: 0`
@@ -106,6 +106,31 @@ async function viaTogether(prompt, { width, height }) {
   }
   throw new Error('Together returned no image data')
 }
+async function viaCloudflare(prompt, { width, height }) {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+  const token = process.env.CLOUDFLARE_API_TOKEN
+  if (!accountId || !token) throw new Error('CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN is not set')
+
+  const model = process.env.CLOUDFLARE_IMAGE_MODEL || '@cf/leonardo/phoenix-1.0'
+  const resp = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, width, height }),
+    }
+  )
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`Cloudflare ${resp.status}: ${body.slice(0, 200)}`)
+  }
+  const contentType = resp.headers.get('content-type') || 'image/jpeg'
+  // Cloudflare returns raw image bytes directly, not JSON-wrapped base64 —
+  // confirmed via a live curl test (response started with JPEG magic bytes).
+  const buffer = Buffer.from(await resp.arrayBuffer())
+  if (!buffer.length) throw new Error('Cloudflare returned an empty image body')
+  return `data:${contentType};base64,${buffer.toString('base64')}`
+}
 
 let _hf
 async function viaHuggingface(prompt, { width, height }) {
@@ -182,6 +207,7 @@ const PROVIDERS = {
   huggingface: viaHuggingface,
   hf: viaHuggingface,
   replicate: viaReplicate,
+  cloudflare: viaCloudflare,
 }
 
 // Providers to fall back to, in order, when the primary fails for a reason that
@@ -192,7 +218,7 @@ const PROVIDERS = {
 // signup. It is skipped automatically while TOGETHER_API_KEY is unset (the
 // provider throws immediately, which `isUnrecoverable` catches), so adding the
 // key is the only step needed to upgrade every cover.
-const FALLBACK_CHAIN = ['together', 'pollinations']
+const FALLBACK_CHAIN = ['cloudflare', 'together'] //remeber to add 'pollinations' if you want it as a fallback
 const isUnrecoverable = (msg) =>
   /quota|limit: 0|RESOURCE_EXHAUSTED|billing|depleted|not set|permission|401|402|403|429/i.test(msg)
 
