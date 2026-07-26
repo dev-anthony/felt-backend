@@ -37,6 +37,14 @@ const CAMERAS = [
     fragment: 'shot on an anamorphic cinema lens with horizontal flare',
     anchor: { darkness: 0.6, intimacy: 0.45, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'MONUMENTAL_SCALE_ISOLATION'], source: 'research: cinematic anamorphic' },
+  { id: 'cam_drone_orthographic', category: 'camera', tags: ['drone', 'aerial', 'overhead', 'orthographic'],
+    fragment: 'shot from a drone directly overhead, a true ninety-degree orthographic view with zero perspective distortion',
+    anchor: { intimacy: 0.15, brightness: 0.55, energy: 0.4, grit: 0.25 },
+    techniques: ['AERIAL_TOP_DOWN'], source: 'FELT technique library v2: orthographic overhead rig' },
+  { id: 'cam_thermal_sensor', category: 'camera', tags: ['thermal', 'infrared', 'sensor', 'surveillance'],
+    fragment: 'captured on a thermal-imaging sensor rather than a conventional lens',
+    anchor: { darkness: 0.7, aggression: 0.45, intimacy: 0.1, valence: 0.2 },
+    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2: infrared/thermal rig' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -173,6 +181,10 @@ const LIGHTING = [
     fragment: 'the frame lit through a single colored gel for one dominant hue, a contrasting rim of color separating the subject from the background',
     anchor: { darkness: 0.55, intimacy: 0.45, motion: 0.4 },
     techniques: ['DUOTONE_COLOR_WASH'] },
+  { id: 'light_infrared_sensor', category: 'lighting', tags: ['infrared', 'thermal', 'false-color', 'night-vision'],
+    fragment: 'no visible-spectrum lighting at all — heat and infrared signature render the scene, faces reading as false-color thermal blooms rather than lit skin',
+    anchor: { darkness: 0.75, aggression: 0.5, valence: 0.15, brightness: 0.3 },
+    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -208,6 +220,11 @@ const MOTION = [
     anchor: { intimacy: 0.65, energy: 0.25, motion: 0.2,
       tempo: 0.15, onsetRate: 0.06, spectralFlux: 0.12 },
     techniques: ['MONUMENTAL_SCALE_ISOLATION', 'MACRO_INTIMATE_DETAIL'] },
+  { id: 'motion_light_trail', category: 'motion', tags: ['light-trail', 'long-exposure', 'static-subject'],
+    fragment: 'a genuine long-exposure light trail tracing the path of a moving light source, the subject itself held still',
+    anchor: { motion: 0.6, energy: 0.55, euphoria: 0.6,
+      tempo: 0.5, onsetRate: 0.3, spectralFlux: 0.6 },
+    techniques: ['LONG_EXPOSURE_LIGHT_PAINTING'], source: 'FELT technique library v2' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -242,6 +259,10 @@ const TEXTURE = [
     // and fast (>2.5 Hz) musical event rates.
     anchor: { brightness: 0.65, grit: 0.2, intimacy: 0.5, onsetRate: 0.10, spectralFlatness: 0.2 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'STUDIO_SEAMLESS_EDITORIAL'] },
+  { id: 'tex_sensor_noise', category: 'texture', tags: ['thermal', 'sensor-noise', 'infrared'],
+    fragment: 'coarse thermal-sensor noise and false-color banding instead of natural film or digital grain',
+    anchor: { grit: 0.6, darkness: 0.65, spectralFlatness: 0.6 },
+    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
