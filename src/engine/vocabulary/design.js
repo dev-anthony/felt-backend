@@ -39,6 +39,14 @@ const COMPOSITION = [
     fragment: 'a claustrophobic tight frame with the subject boxed in by enclosing geometry',
     anchor: { darkness: 0.65, intimacy: 0.55, valence: 0.25 },
     techniques: ['SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH'] },
+  { id: 'comp_orthographic_overhead', category: 'composition', tags: ['aerial', 'overhead', 'pattern', 'orthographic'],
+    fragment: 'a direct ninety-degree overhead composition where the subject and environment read as flat graphic pattern rather than dimensional space',
+    anchor: { intimacy: 0.1, energy: 0.4, brightness: 0.55, spectralFlux: 0.25 },
+    techniques: ['AERIAL_TOP_DOWN'], source: 'FELT technique library v2' },
+  { id: 'comp_panel_grid', category: 'composition', tags: ['panel', 'grid', 'lineup', 'multi-subject'],
+    fragment: 'a structured multi-panel grid, each subject occupying its own clean cell with a visible seam between panels',
+    anchor: { energy: 0.55, aggression: 0.4, valence: 0.45, spectralFlux: 0.3 },
+    techniques: ['GRAPHIC_PANEL_COMPOSITE'], source: 'FELT technique library v2' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -73,6 +81,10 @@ const COLOR_SYSTEMS = [
     fragment: 'one saturated seamless color field filling the background behind the subject',
     anchor: { euphoria: 0.65, energy: 0.6, valence: 0.6 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
+  { id: 'color_infrared_false', category: 'color', tags: ['infrared', 'false-color', 'thermal'],
+    fragment: 'false-color infrared rendering — heat-signature reds/whites against cold monochrome green or blue, nothing reading as natural skin tone',
+    anchor: { darkness: 0.65, aggression: 0.45, valence: 0.2, brightness: 0.4 },
+    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -143,6 +155,10 @@ const GRAPHIC_TREATMENTS = [
     fragment: 'a restrained luxury-editorial layout built on emptiness and precision',
     anchor: { intimacy: 0.55, brightness: 0.6, valence: 0.5 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MONUMENTAL_SCALE_ISOLATION'] },
+  { id: 'graphic_panel_grid', category: 'graphic', tags: ['panel', 'lineup', 'grid', 'mugshot'],
+    fragment: 'a real panel or grid layout — a mugshot-style lineup or stacked-portrait grid, each frame its own exposure',
+    anchor: { grit: 0.55, aggression: 0.55, energy: 0.55, valence: 0.4 },
+    techniques: ['GRAPHIC_PANEL_COMPOSITE'], source: 'FELT technique library v2' },
 ]
 
 /**

@@ -18,6 +18,9 @@ const {
   TECHNIQUE_SUFFIXES,
   DEFAULT_TECHNIQUE,
   isValidTechnique,
+  TECHNIQUES,
+  selectTechnique,
+  getFallbackTechnique,
 } = require('../engine/technique')
 
 const { genreLineage, subjectModeRule } = require('../config/artistProfile')
@@ -28,6 +31,31 @@ const { genreLineage, subjectModeRule } = require('../config/artistProfile')
 // line buried among five technical ones, so it steered nothing.
 const { readEmotion, emotionalRegisterBlock } = require('../engine/emotion')
 const { buildFeatureVector } = require('../engine/dna/featureVector')
+
+/**
+ * MATH-DRIVEN TECHNIQUE SELECTION.
+ *
+ * Technique is no longer something Gemini picks from a text menu. Emotion
+ * interprets the audio (archetype + intensity), then selectTechnique() scores
+ * all 15 techniques against that read via the affinity matrix + the track's
+ * own movement/chaos signal. Gemini's job is only to write the scene for
+ * whichever technique this returns — it never sees a menu.
+ */
+function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId) {
+  try {
+    const vector = buildFeatureVector(features)
+    // read.archetypeId ('MELANCHOLY' etc.) and read.intensity ('low'|'medium'
+    // |'high'|'extreme') are both plain strings directly on the return object
+    // — confirmed against engine/emotion/index.js.
+    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
+    const technique = selectTechnique(read.archetypeId, read.correctedVector, { intensity: read.intensity })
+    console.log(`[TECHNIQUE SELECT] archetype=${read.archetypeId} intensity=${read.intensity} kinetic=${read.kinetic} -> ${technique}`)
+    return technique
+  } catch (err) {
+    console.warn(`[TECHNIQUE SELECT] scoring failed, using fallback: ${err?.message || err}`)
+    return getFallbackTechnique(features ? buildFeatureVector(features) : undefined)
+  }
+}
 
 /** Builds the labeled register block for a track + the artist's own words. */
 function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId) {
@@ -62,13 +90,14 @@ async function geminiRawText(promptText) {
   return response.text?.trim() || ''
 }
 
-function deserializeBrief(stored) {
+function deserializeBrief(stored, features) {
   if (!stored) return null
+  const fallbackTechnique = () => getFallbackTechnique(features ? buildFeatureVector(features) : undefined)
   try {
     const parsed = JSON.parse(stored)
     if (parsed && typeof parsed.scene === 'string') {
       return {
-        technique: TECHNIQUE_SUFFIXES[parsed.technique] ? parsed.technique : DEFAULT_TECHNIQUE,
+        technique: TECHNIQUE_SUFFIXES[parsed.technique] ? parsed.technique : fallbackTechnique(),
         scene: parsed.scene,
         structured: true,
       }
@@ -76,7 +105,7 @@ function deserializeBrief(stored) {
   } catch {
     // Left unexpanded
   }
-  return { technique: DEFAULT_TECHNIQUE, scene: stored, structured: false }
+  return { technique: fallbackTechnique(), scene: stored, structured: false }
 }
 
 const PERSON_SUBJECT_BLOCK = `SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
@@ -139,33 +168,25 @@ const MEDIUM_BRIEF = {
   },
 }
 
-function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person' } = {}) {
+function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person', technique } = {}) {
   const M = MEDIUM_BRIEF[mediumFamily] || MEDIUM_BRIEF.photo
   const subjectBlock = subjectMode === 'absent' ? ABSENT_SUBJECT_BLOCK : PERSON_SUBJECT_BLOCK
+  const techniqueName = TECHNIQUES[technique] ? technique : DEFAULT_TECHNIQUE
+  const t = TECHNIQUES[techniqueName]
   return `You are the art director for a real recording artist's single cover. ${M.opener} You do not write poetry, mood boards, or explanations.
 
 Everything you write must serve one goal: someone who has heard this song should look at the cover and recognise it. Not "a nice image" — THIS song's image.
 
-An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. It is the single most important input you receive. Read it first and let it govern the entire frame — the register, the aesthetic world, the intensity tier, the MOVEMENT line, and above all the VISUAL DIRECTION line.\n- VISUAL DIRECTION is the distilled result of a twelve-archetype x three-world x four-intensity matrix built from music-psychology research. It names the lighting, palette, composition and texture this exact combination calls for. Treat it as the brief, not as a suggestion: your scene must be a place and a moment where that direction is what would naturally be seen.\n- If VISUAL DIRECTION describes an object, a material or an abstraction rather than a person, follow it there. Do not force a human figure into it.
+An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it first and let it govern the frame — the register, the aesthetic world, the intensity tier, the MOVEMENT line, and above all the VISUAL DIRECTION line.
+- VISUAL DIRECTION names the lighting, palette, composition and texture this combination calls for. Treat it as the brief.
+- If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it there.
 
-TECHNIQUE LIBRARY — choose exactly ONE, matched to the emotional register:
-
-1. FLASH_DOCUMENTARY — defiance, chaotic joy, party energy, raw confession. Unstaged, candid, 2am.
-2. VINTAGE_FILM_NOSTALGIA — nostalgia, cruising, comfort, warm memory, retro pride.
-3. SILHOUETTE_ATMOSPHERE — isolation, grandeur, spiritual searching. The light source, not the face, is the subject.
-4. SURREAL_PRACTICAL_METAPHOR — internal conflict, pain, addiction, existential weight. One real physical object staged against the body.
-5. DUOTONE_COLOR_WASH — obsession, melancholy, night driving, longing. One dominant hue through the whole frame.
-6. MACRO_INTIMATE_DETAIL — vulnerability, sensuality, tenderness. One feature filling the frame.
-7. MOTION_BLUR_STROBE — dancing, mania, spiralling thought, physical release. Real long-exposure blur.
-8. MIRROR_DOUBLE_EXPOSURE — duality, identity conflict, self-confrontation.
-9. STUDIO_SEAMLESS_EDITORIAL — confidence, boldness, one strong emotional colour.
-10. MONUMENTAL_SCALE_ISOLATION — loneliness, absence, memory, freedom, small-against-the-world.
-
-TECHNIQUE SELECTION (CRITICAL — do NOT default to silhouettes):
-- Choose what genuinely fits the register, and VARY it across songs.
-- SILHOUETTE_ATMOSPHERE and MONUMENTAL_SCALE_ISOLATION HIDE the face and identity. Use them ONLY when the song is truly about isolation, anonymity, grandeur or absence. They are the exception.
-- Most covers should REVEAL the face. A dark or moody register does NOT require a silhouette.
-- When the MOVEMENT line reads HIGH, strongly prefer a technique that can carry motion (MOTION_BLUR_STROBE, FLASH_DOCUMENTARY, STUDIO_SEAMLESS_EDITORIAL). Never answer a high-movement track with a still, contemplative frame.
+LOCKED TECHNIQUE (already chosen mathematically from this track's emotion — do NOT choose a different one, do NOT mention its name or output a TECHNIQUE line):
+- ${techniqueName} — ${t.purpose}
+- Visual signature: ${t.visualSignature}
+- Best for: ${t.bestFor.join('; ')}
+- Common mistake to avoid: ${t.commonMistakes}
+- Write the scene so this technique feels inevitable — the location, action and staging should be what a photographer would naturally reach for to shoot it this way.
 
 RELEVANCE MANDATE (this is the entire job):
 - The scene MUST be visibly, specifically about what THIS song is about. Stage the actual situation, place, person or moment the artist and the lyrics describe.
@@ -208,9 +229,8 @@ STORY-ONLY RULE:
 - Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy".
 
 OUTPUT FORMAT (CRITICAL):
-Respond with exactly two lines, nothing else:
-TECHNIQUE: <one of the 10 technique names above, exact match>
-SCENE: <2-3 sentence cinematic moment grounded in this song. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No preamble, no quotes, no lyric excerpts.>`
+Respond with exactly one thing, nothing else — no label, no preamble, no quotes:
+<2-3 sentence cinematic moment grounded in this song, staged to suit the LOCKED TECHNIQUE above. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No lyric excerpts.>`
 }
 
 /**
@@ -266,17 +286,11 @@ function deriveSceneMode(features) {
 
 function parseSceneResponse(rawText, fallbackScene) {
   const text = (rawText || '').trim()
-  if (!text) {
-    return { technique: DEFAULT_TECHNIQUE, scene: fallbackScene }
-  }
-  const techniqueMatch = text.match(/TECHNIQUE:\s*([A-Z_]+)/i)
-  const sceneMatch = text.match(/SCENE:\s*([\s\S]+)/i)
-
-  const technique = techniqueMatch?.[1]?.toUpperCase()
-  const validTechnique = TECHNIQUE_SUFFIXES[technique] ? technique : DEFAULT_TECHNIQUE
-  const scene = sceneMatch?.[1]?.trim() || text
-
-  return { technique: validTechnique, scene }
+  if (!text) return { scene: fallbackScene }
+  // Technique was locked before this prompt was built — strip a stray
+  // "SCENE:" label if the model adds one out of habit, but don't require it.
+  const scene = text.replace(/^SCENE:\s*/i, '').trim() || fallbackScene
+  return { scene }
 }
 
 function buildFluxPrompt(technique, scene) {
@@ -316,21 +330,20 @@ function sceneFailsSafetyCheck(scene) {
 const SAFE_FALLBACK_SCENE = 'A figure standing in soft directional light, quiet and composed, fully clothed in simple modern styling, captured mid-thought against a plain textured wall.'
 
 async function generateSafeScene(promptText, options) {
-  let { technique, scene } = await generateWithRetry(promptText, options)
+  let { scene } = await generateWithRetry(promptText, options)
 
   if (sceneFailsSafetyCheck(scene)) {
     console.warn('[SAFETY] Rejected scene brief on first pass — retrying with stricter constraints')
     const stricterPrompt = `${promptText}\n\nSTRICT REQUIREMENT: All subjects must be fully clothed in tasteful, modern styling. No exceptions, no nudity, no undergarments as outerwear, no suggestive framing.`
-    ;({ technique, scene } = await generateWithRetry(stricterPrompt, { ...options }))
+    ;({ scene } = await generateWithRetry(stricterPrompt, { ...options }))
 
     if (sceneFailsSafetyCheck(scene)) {
       console.warn('[SAFETY] Rejected scene brief on second pass — falling back to hardcoded safe scene')
-      technique = DEFAULT_TECHNIQUE
       scene = SAFE_FALLBACK_SCENE
     }
   }
 
-  return { technique, scene }
+  return { scene }
 }
 
 function serializeBrief(technique, scene) {
@@ -378,11 +391,9 @@ async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '
 }
 
 async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext, features }) {
-  const promptText = `${aestheticSystemPrompt(deriveSceneMode(features))}
+  const technique = resolveTechnique(features, null, userInput)
+  const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(features), technique })}
 
-${emotionalRegister2 ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
-${emotionalRegister2}
-` : ''}
 INPUT MATRIX TO CONVERT:
 1. Artist's Core Feeling / What The Song Is About: "${userInput.trim()}"
 2. Song Lyrics: "${lyrics || 'No lyrics available — treat as instrumental-leaning emotional content'}"
@@ -390,10 +401,11 @@ INPUT MATRIX TO CONVERT:
 ${artistContext ? `4. Artist Branding Space Context: ${artistContext}` : ''}`;
 
   try {
-    return await generateSafeScene(promptText, { fallbackScene: userInput.trim() })
+    const { scene } = await generateSafeScene(promptText, { fallbackScene: userInput.trim() })
+    return { technique, scene }
   } catch (err) {
     console.error(`⚠️ Scene brief synthesis fallback triggered: ${err?.message || err}`)
-    return { technique: DEFAULT_TECHNIQUE, scene: userInput.trim() }
+    return { technique, scene: userInput.trim() }
   }
 }
 
@@ -477,26 +489,25 @@ router.post('/expand', requireAuth, async (req, res) => {
 
     const artist = await fetchArtistProfile(userId);
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
+const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
+    const technique = resolveTechnique(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
 
-    const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
-
-    const promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
+    const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
-${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
 ` : ''}
 Artist input text: "${basic_input.trim()}"
 Audio context variables: ${audioContext}
 ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
 
-    let technique, scene
+    let scene
     try {
-      ({ technique, scene } = await generateSafeScene(promptText, {
+      ({ scene } = await generateSafeScene(promptText, {
         fallbackScene: basic_input.trim(),
       }))
     } catch (gErr) {
       console.error(`[EXPAND ENGINE] Gemini fault after retries: ${gErr?.message || gErr}`)
-      technique = DEFAULT_TECHNIQUE
       scene = basic_input.trim()
     }
 
@@ -640,16 +651,19 @@ router.post('/transcribe', requireAuth, async (req, res) => {
       }
     }
 
-    // ── STEP 3: Handle execution logic paths exactly like /expand ──
+// ── STEP 3: Handle execution logic paths exactly like /expand ──
+    // Technique is locked once, from the audio + whatever text context exists
+    // so far — both branches below write a scene for the SAME technique.
+    const technique = resolveTechnique(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
     let promptText = '';
 
     if (!lyricsText || !lyricsText.trim()) {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
       const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
-      promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
+      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
-${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
 ` : ''}
 VOCAL CONTEXT RULE: This song contains VOCALS, not an instrumental track. Fully expand the user prompt below into a beautifully tailored visual representation matching a vocal track presence to avoid generic cover art layouts.
@@ -661,7 +675,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
       const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId)
-      promptText = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
+      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
@@ -670,9 +684,9 @@ INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is ab
 ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}` : ''}`;
     }
 
-    let technique, scene
+    let scene
     try {
-      ({ technique, scene } = await generateSafeScene(promptText, {
+      ({ scene } = await generateSafeScene(promptText, {
         fallbackScene: userVibeInput.trim(),
       }))
       console.log(`[SCENE RECONCILIATION] Resolved scene for upload=${upload_id} with technique=${technique}`);
@@ -681,7 +695,6 @@ ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}`
         `⚠️ Transcribe-stage Gemini expansion fallback triggered after retries: ${gErr?.message || gErr}` +
         (gErr?.cause ? ` | cause: ${gErr.cause.code || gErr.cause.message || gErr.cause}` : '')
       )
-      technique = DEFAULT_TECHNIQUE
       scene = userVibeInput.trim()
     }
 
@@ -750,10 +763,14 @@ router.post('/', requireAuth, async (req, res) => {
     if (lyric_context) {
       scene = lyric_context.trim()
       if (TECHNIQUE_SUFFIXES[techniqueOverride]) {
+        // Explicit user override — a real feature, not Gemini randomness, so
+        // it's kept as-is.
         technique = techniqueOverride
       } else {
-        const storedBrief = deserializeBrief(upload.sentence_prompt)
-        technique = (storedBrief && storedBrief.structured) ? storedBrief.technique : DEFAULT_TECHNIQUE
+        const storedBrief = deserializeBrief(upload.sentence_prompt, upload.audio_features)
+        technique = (storedBrief && storedBrief.structured)
+          ? storedBrief.technique
+          : resolveTechnique(upload.audio_features, genreLineage(artistProfile.default_genre), lyric_context)
       }
     } else {
       const storedBrief = deserializeBrief(upload.sentence_prompt)
@@ -899,24 +916,31 @@ router.patch('/refine', requireAuth, async (req, res) => {
       genreLineage(refineProfile.default_genre)
     );
 
-    const refinementPrompt = `${aestheticSystemPrompt(deriveSceneMode(upload.audio_features))}
+    // Technique is locked to whatever the original generation used — refine
+    // re-stages the same look, it never re-rolls the technique itself. If
+    // there's no prior structured brief, score it fresh from the audio.
+    const existingBrief = deserializeBrief(upload.sentence_prompt, upload.audio_features)
+    const technique = (existingBrief && existingBrief.structured)
+      ? existingBrief.technique
+      : resolveTechnique(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest)
+
+    const refinementPrompt = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
 ${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
-You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — keep the same technique unless the request clearly demands a different one.
+You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — the technique above is LOCKED; write a new staging that suits it.
 
 INPUT REFINEMENT VARIABLES:
 1. Modification Request: "${modRequest || 'No specific change requested — generate a distinctly different alternate take of the same concept: a new pose, moment, angle or setting detail.'}"
-2. Existing Brief: ${deserializeBrief(upload.sentence_prompt)?.scene || 'Baseline generation profile'}
+2. Existing Brief: ${existingBrief?.scene || 'Baseline generation profile'}
 3. Underlying Track Sonic Signature: ${trackSonicFeatures}`;
 
-    const refineFallback = modRequest || deserializeBrief(upload.sentence_prompt)?.scene || 'Abstract intense emotion'
-    let technique, scene
+    const refineFallback = modRequest || existingBrief?.scene || 'Abstract intense emotion'
+    let scene
     try {
-      ({ technique, scene } = await generateSafeScene(refinementPrompt, {
+      ({ scene } = await generateSafeScene(refinementPrompt, {
         fallbackScene: refineFallback,
       }))
     } catch (gErr) {
       console.error(`⚠️ Refinement expansion fallback applied after retries: ${gErr?.message || gErr}`);
-      technique = DEFAULT_TECHNIQUE
       scene = refineFallback
     }
 
