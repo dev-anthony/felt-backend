@@ -109,7 +109,7 @@ function deserializeBrief(stored, features) {
 }
 
 const PERSON_SUBJECT_BLOCK = `SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
-- DECIDE WHO belongs here — never default to a young woman. From the genre, register and lyrics choose gender, an age that fits (a child, a teenager, someone in their 20s-40s, an elder), build and cultural context. Men, women, children, elders and unconventional-looking people all belong. Vary this every time.
+- DECIDE WHO belongs here — never default to a young woman. Vary gender every time (masculine, feminine, androgynous — don't repeat the same one across songs). Age stays in an 18-35 range (late teens through mid-30s) — do not depict children or elders. Vary build and cultural context freely within that range.
 - ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
 - SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
 - ONE or TWO distinctive markers so they look like SOMEBODY: a lined fade, box braids, locs, a durag, grey hair, a gap or gold tooth, a nose ring, a face or hand tattoo, expressive makeup, cultural jewellery, a signature hat.

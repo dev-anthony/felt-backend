@@ -37,8 +37,19 @@ const SUBJECT_ARCHETYPES = [
     techniques: ['MACRO_INTIMATE_DETAIL'] },
   { id: 'subj_absent', category: 'subject', tags: ['no-figure', 'object', 'memory'],
     fragment: 'no human figure at all — a single object or empty scene carrying the emotion',
-    anchor: { darkness: 0.5, intimacy: 0.45, energy: 0.3 },
-    techniques: ['MONUMENTAL_SCALE_ISOLATION'] },
+    // Broadened anchor and dropped the single-technique restriction — this was
+    // starved the same way non-photo mediums were. A cracked terrazzo stairwell
+    // or a half-drunk glass of palm wine is right for far more than one archetype.
+    anchor: { darkness: 0.45, intimacy: 0.4, energy: 0.3, acousticness: 0.4 } },
+  { id: 'subj_crowd', category: 'subject', tags: ['crowd', 'anonymous', 'communion'],
+    fragment: 'a real crowd of distinguishable people, no single face resolving as the subject — raised arms, packed bodies, natural variety',
+    anchor: { danceability: 0.75, euphoria: 0.7, motion: 0.75, energy: 0.7 } },
+  { id: 'subj_object_as_head', category: 'subject', tags: ['object-substitute', 'surreal', 'identity'],
+    fragment: 'a figure whose head is physically replaced or obscured by one meaningful burning, held, or worn object — the object carries the identity, not the face',
+    anchor: { darkness: 0.5, aggression: 0.35, intimacy: 0.35, valence: 0.35 } },
+  { id: 'subj_duo_group', category: 'subject', tags: ['duo', 'group', 'multi-subject'],
+    fragment: 'two or more distinct subjects, each built with full individual rigor, sharing one frame or one panel layout',
+    anchor: { euphoria: 0.5, energy: 0.55, valence: 0.5 } },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
@@ -70,13 +81,11 @@ const ART_MEDIUMS = [
   { id: 'medium_photography', category: 'artMedium', tags: ['photo', 'default'],
     fragment: 'a real photograph',
     anchor: { grit: 0.45, brightness: 0.5, energy: 0.5, intimacy: 0.5 },
-    // Photographic realism is FELT's default anti-AI thesis, so this concept is
-    // compatible with every technique and wins unless a niche illustrated
-    // medium is a much stronger anchor match.
-    techniques: ['FLASH_DOCUMENTARY', 'VINTAGE_FILM_NOSTALGIA', 'SILHOUETTE_ATMOSPHERE',
-      'SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH', 'MACRO_INTIMATE_DETAIL',
-      'MOTION_BLUR_STROBE', 'MIRROR_DOUBLE_EXPOSURE', 'STUDIO_SEAMLESS_EDITORIAL',
-      'MONUMENTAL_SCALE_ISOLATION'] },
+    // No longer carries a blanket technique bonus (see dna/index.js LAYERS —
+    // artMedium now scores like every other layer). Photography still wins
+    // the plurality of tracks because most anchors legitimately point at it,
+    // but it no longer wins by construction.
+  },
   { id: 'medium_riso', category: 'artMedium', tags: ['risograph', 'print', 'illustration'],
     fragment: 'a risograph print illustration with textured ink layers',
     anchor: { valence: 0.6, acousticness: 0.55, energy: 0.4 } },
@@ -103,6 +112,12 @@ const ART_MEDIUMS = [
   { id: 'medium_cel_shaded_anime', category: 'artMedium', tags: ['cel-shaded', 'anime', 'comic', 'illustration'],
     fragment: 'a cel-shaded comic illustration with clean ink linework, flat shadow blocks and halftone screentone',
     anchor: { warmth: 0.6, acousticness: 0.5, brightness: 0.35, tempo: 0.42, valence: 0.55 } },
+  { id: 'medium_painterly_moody', category: 'artMedium', tags: ['painterly', 'illustration', 'digital-painting', 'moody'],
+    fragment: 'a moody digital painting with visible brushwork, soft atmospheric color blending and painted light',
+    anchor: { darkness: 0.55, intimacy: 0.6, acousticness: 0.5, valence: 0.4 } },
+  { id: 'medium_narrative_illustration', category: 'artMedium', tags: ['illustration', 'environmental', 'scene', 'narrative'],
+    fragment: 'a full narrative illustration where the environment itself tells the story, figures small within a detailed painted scene',
+    anchor: { warmth: 0.55, valence: 0.55, acousticness: 0.45, energy: 0.4 } },
 
   // Module 5 / Medium 3. The research names this medium's defining triggers
   // explicitly: "heavy sub-bass energy ratios (>0.40), low spectral flatness

@@ -15,9 +15,11 @@ const photo = require('./photography')
 const design = require('./design')
 const creative = require('./creative')
 const symbolism = require('./symbolism')
+const pose = require('./pose')
 
 /** category → concept[] */
 const VOCABULARY = {
+  pose: pose.POSE,
   camera: photo.CAMERAS,
   lens: photo.LENSES,
   filmStock: photo.FILM_STOCKS,

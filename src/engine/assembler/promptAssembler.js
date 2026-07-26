@@ -150,8 +150,11 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
     family === 'photo'
       ? photographicRealityTail({
           singleSubject: !allowGroup,
-          faceVisible: !techniqueHidesFace(technique),
+          crowd: dna.selections.subject?.conceptId === 'subj_crowd',
+          faceVisible: !techniqueHidesFace(technique) && dna.selections.subject?.conceptId !== 'subj_object_as_head',
           noPeople,
+          lensAnchor: getConcept(dna.selections.lens?.conceptId)?.anchor,
+          seed: dna.vector.meta.seed,
         })
       : family === 'cgi'
         ? cgiRealityTail()

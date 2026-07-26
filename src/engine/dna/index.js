@@ -33,9 +33,14 @@ const LAYERS = [
   // artMedium: photographic realism is FELT's default, so give the technique
   // bonus (which only medium_photography carries) extra weight — an illustrated
   // medium must be a decisively better anchor match to win.
-  { key: 'artMedium',      category: 'artMedium',      priority: 1,  fallbackId: 'medium_photography',    explore: 0.12, bonus: 0.22 },
+  // No longer a special case — true even competition across mediums. Was
+  // explore:0.12/bonus:0.22 (near-argmax, huge technique bonus only photography
+  // could ever earn), which meant illustration/CGI were mathematically starved
+  // regardless of how well their anchors actually matched a track.
+  { key: 'artMedium',      category: 'artMedium',      priority: 1,  fallbackId: 'medium_photography',    explore: 0.32 },
   { key: 'editorial',      category: 'editorial',      priority: 2,  fallbackId: 'edit_documentary',      explore: 0.30 },
   { key: 'subject',        category: 'subject',        priority: 3,  fallbackId: 'subj_editorial_minimal',explore: 0.30 },
+  { key: 'pose',           category: 'pose',           priority: 3.5,fallbackId: 'pose_glancing_back',    explore: 0.35 },
   { key: 'environment',    category: 'environment',    priority: 4,  fallbackId: 'env_seamless_studio',   explore: 0.35 },
   { key: 'camera',         category: 'camera',         priority: 5,  fallbackId: 'cam_hasselblad_h6d',    explore: 0.30 },
   { key: 'lens',           category: 'lens',           priority: 6,  fallbackId: 'lens_80mm_f28',         explore: 0.30 },
