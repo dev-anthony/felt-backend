@@ -1,44 +1,37 @@
 'use strict'
-/**
- * ARCHETYPE 6 — Dread, Terror & Paranoia
- *
- * Research Module 1. Visual directions are distilled from the research's
- * per-cell tables (lighting / colour / composition / texture) into one dense
- * phrase per Aesthetic State × Visual Intensity — 12 cells per archetype.
- */
+/** 
+
+* ARCHETYPE 6 — Dread, Terror & Paranoia (The Visual Manifesto)
+* 
+* Research Module 1. Visual directions are distilled into a pure creative manifesto.
+* The voice is that of an encroaching, clinical observer documenting an inescapable
+* truth: that safety is the greatest deception, every false sanctuary is already a
+* confinement cell, and stillness itself has become predatory.
+*/
 module.exports = {
-  label: 'Dread, Terror & Paranoia',
-  genres: 'Death industrial, dark techno, horror score, noise, drone metal',
-  register: 'hyper-vigilance and impending threat — claustrophobic, watched',
-  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
-  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
-  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
-  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
-  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
-  // rather than expressive, and uniformly penalised its archetype. Rescaled
-  // linearly: every archetype keeps its exact position relative to the others,
-  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
-  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
-  anchor: { darkness: 0.85, aggression: 0.6, valence: 0.195, brightness: 0.35, acousticness: 0.15 },
-  motionBias: 0.35,
-  states: {
-    normal: {
-      low: 'unbalanced institutional corridor lighting, pale institutional grey with shadow blocking every exit, severe clinical symmetry down a long empty hallway, hard sterile concrete tiling in cold uniform reflection',
-      medium: 'an unseen off-axis light source, heavy shadow weight against one stark white focal point, an aggressive Dutch angle across a dark treeline, thick tangled undergrowth and rough geometric bark',
-      high: 'high-contrast flash on something behind glass, distorted skin tones and hard glare against absolute black, an extreme close-up of a human profile pressed behind dirty glass, grease smudges heavy across the optical surface',
-      extreme: 'high-velocity motion blur dissolving the space, chaotic smeared colour tracks over deep shadow voids, an abstract kinetic vortex consuming human geometry, violent motion streaking and heavy compression noise',
-    },
-    luxury: {
-      low: 'sterile high-end laboratory illumination, unyielding clean operating white against surgical steel grey, rigid architectural layout across a commercial security zone, flawless chrome plate and high-gloss epoxy floor',
-      medium: 'a single screen glowing in an executive dark space, terminal blue highlight against absolute leather black, a low angle on empty high-end boardroom chairs, deep premium leather pores and polished mahogany',
-      high: 'moving vehicle light sweeping through a dark cabin, rapid blood-red sweeps across obsidian black voids, a backseat perspective onto a silhouetted driver, high-gloss window reflection over luxury fabric',
-      extreme: 'surreal high-fashion nightmare styling, polished latex black with highly reflective liquid chrome, radical geometric models wrapped in dark synthetics, frictionless latex sheen and hyper-sharp abstract borders',
-    },
-    gritty: {
-      low: 'corrupted sodium-vapour light in a parking garage, toxic industrial orange over asphalt black and decaying concrete grey, a CCTV framing of a long empty underground structure, broken concrete gravel and exposed rusted rebar',
-      medium: 'a low-resolution active night-vision sensor, monochromatic infrared green with bright white flares, a high security vantage tracking dark figures below, heavy sensor noise and pixelated block artifacts',
-      high: 'a defensive flashlight held under the chin, bleached skin tones with hard shadow thrown upward off the jaw, intimate aggressive portraiture capturing raw perspiration, dense sweat layers and coarse fabric grain',
-      extreme: 'a physically mangled lens capture, disordered colour separation under heavy light burn, completely shattered perspective lines across a broken room, cracked lens glass and physical hardware destruction',
-    },
-  },
+label: 'Dread, Terror & Paranoia',
+genres: 'Death industrial, dark techno, horror score, noise, drone metal',
+register: 'hyper-vigilance, unyielding encroachment, the crushing weight of an unseen presence',
+anchor: { darkness: 0.85, aggression: 0.6, valence: 0.195, brightness: 0.35, acousticness: 0.15 },
+motionBias: 0.35,
+states: {
+normal: {
+low: 'An institutional space staging a visual paradox where an empty hallway feels intensely overcrowded. Unbalanced corridor lighting casts a pale institutional grey while long shadows systematically block every exit, framing a severe clinical symmetry that transforms protection into an inescapable trap.',
+medium: 'A landscape redefined by a sinister paradox where illumination hides more than darkness, forcing the eye to negotiate a false sanctuary. Heavy shadow weight presses against a single stark white focal point from an unseen source, while an aggressive Dutch angle tracks an encroaching treeline.',
+high: 'The human form reduced to an object of intrusive observation, where the illusion of privacy collapses entirely. High-contrast flash creates a hard glare against absolute black as an extreme close-up captures a human profile pressed behind dirty glass, where grease smudges become evidence of repeated failed escape.',
+extreme: 'Space undergoing complete kinetic erasure, proving that total predictability can still inspire a deep, animalistic panic. High-velocity motion blur obliterates geometry into smeared colour tracks and deep shadow voids, where structural data breaks down under a predatory storm of compression noise.',
+},
+luxury: {
+low: 'An elite environment where luxury functions as an unyielding system of total corporate containment. Sterile high-end laboratory illumination casts a clean operating white against surgical steel grey, proving that safety increases vulnerability across a rigid commercial security zone.',
+medium: 'Power isolated in a void, where wealth has quietly completed its transition into a solitary confinement cell. A single screen glows within an executive dark space, casting a cold terminal blue highlight against absolute leather black, where empty boardroom chairs imply an invisible presence.',
+high: 'An inescapable pursuit captured from within a moving cell, staging a paradox where continuous motion feels entirely stagnant. Moving vehicle lights sweep through a dark cabin, casting rapid blood-red streaks across obsidian black voids to isolate a backseat perspective of a silhouetted driver.',
+extreme: 'An immaculate visual paradox where high-fashion styling morphs into an absolute, frictionless nightmare. Polished black latex interacts with highly reflective liquid chrome to wrap radical geometric models in dark synthetics, creating frictionless surfaces where perfection itself becomes predatory.',
+},
+gritty: {
+low: 'A decaying urban infrastructure documenting a civilization systematically entombed by its own architects. Corrupted sodium-vapor light stains a parking garage a toxic industrial orange over asphalt black, utilizing a distant CCTV framing to prove that observation is indistinguishable from imprisonment.',
+medium: 'Humanity monitored as a target through a cold mechanical lens, reducing an active presence to a mere infrared signature. A low-resolution active night-vision sensor transforms the world into monochromatic infrared green with bright white flares, tracking dark figures from a high security vantage.',
+high: 'A defensive gesture that only highlights vulnerability, turning a weapon of light into an instrument of absolute self-betrayal. A flashlight held under the chin bleaches skin tones and throws hard shadows upward off the jaw, capturing an intimate, sweaty portrait of raw, unvarnished hyper-vigilance.',
+extreme: 'A perspective completely shattered by physical hardware destruction, where the camera itself has succumbed to environmental encroachment. A mangled lens capture forces a chaotic colour separation under a heavy light burn, until the camera can no longer distinguish documentation from survival.',
+},
+},
 }
