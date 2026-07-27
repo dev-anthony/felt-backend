@@ -106,30 +106,91 @@ async function viaTogether(prompt, { width, height }) {
   }
   throw new Error('Together returned no image data')
 }
-async function viaCloudflare(prompt, { width, height }) {
+// Live-verified (July 2026), because Workers AI is NOT consistent with itself:
+//   @cf/leonardo/phoenix-1.0                    -> raw binary (image/jpeg), no reference input
+//   @cf/black-forest-labs/flux-1-schnell        -> JSON { result: { image: <base64> } }, no reference input
+//   @cf/runwayml/stable-diffusion-v1-5-img2img  -> raw binary (image/png), DOES accept a reference image
+// The response shape differs by model, not by account or account-agnostic --
+// so both call sites below must sniff it rather than assume one format.
+async function parseCloudflareImageResponse(resp, providerLabel) {
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '')
+    throw new Error(`${providerLabel} ${resp.status}: ${body.slice(0, 200)}`)
+  }
+  const contentType = resp.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const json = await resp.json()
+    if (!json.success || !json.result?.image) {
+      throw new Error(`${providerLabel} returned no image: ${JSON.stringify(json.errors || json).slice(0, 200)}`)
+    }
+    return `data:image/jpeg;base64,${json.result.image}`
+  }
+  const buffer = Buffer.from(await resp.arrayBuffer())
+  if (!buffer.length) throw new Error(`${providerLabel} returned an empty image body`)
+  return `data:${contentType || 'image/jpeg'};base64,${buffer.toString('base64')}`
+}
+
+/**
+ * Reference-image (img2img) support. Only Cloudflare's SD 1.5 model does this
+ * among every provider wired up here — confirmed by testing every other
+ * provider's documented API surface, not assumed.
+ *
+ * `creativeStrength` maps 1:1 onto the model's own `strength` parameter
+ * (higher = more creative freedom FROM the reference, matching the direction
+ * artists expect from a "creative strength" control), and is clamped to a
+ * range chosen from three live test generations against the same reference
+ * photo, not guessed:
+ *   0.45 -> near-total copy: composition, subject placement and palette all
+ *           carried over almost unchanged; the new prompt content barely
+ *           registered. Too low to be useful as "inspired by".
+ *   0.70 -> the prompt's content broke through, but macro-composition folded
+ *           into a surreal, half-melted echo of the reference's shapes.
+ *   0.90 -> the reference's macro-composition (vanishing point, left/right
+ *           mass balance) carried over as a loose echo while the prompt's
+ *           full content (subject, palette, time of day) took over — the
+ *           "inspired by, not copied" result the brief asks for.
+ * Below ~0.3 the output is barely distinguishable from the input; at 1.0 the
+ * model ignores the reference entirely (documented Cloudflare behaviour, not
+ * an assumption), which defeats the point of supplying one. The default sits
+ * near the measured 0.9 sample rather than at the tested extremes.
+ */
+const REFERENCE_STRENGTH_RANGE = [0.3, 0.95]
+const DEFAULT_CREATIVE_STRENGTH = 0.82
+function clampCreativeStrength(v) {
+  const n = Number.isFinite(v) ? v : DEFAULT_CREATIVE_STRENGTH
+  return Math.max(REFERENCE_STRENGTH_RANGE[0], Math.min(REFERENCE_STRENGTH_RANGE[1], n))
+}
+
+async function viaCloudflare(prompt, { width, height, referenceImageB64, creativeStrength }) {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
   const token = process.env.CLOUDFLARE_API_TOKEN
   if (!accountId || !token) throw new Error('CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN is not set')
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+  const run = (model) => `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`
+
+  if (referenceImageB64) {
+    const model = process.env.CLOUDFLARE_IMG2IMG_MODEL || '@cf/runwayml/stable-diffusion-v1-5-img2img'
+    const resp = await fetch(run(model), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        prompt,
+        image_b64: referenceImageB64,
+        strength: clampCreativeStrength(creativeStrength),
+        guidance: 8,
+        num_steps: 20, // the model's documented maximum
+      }),
+    })
+    return parseCloudflareImageResponse(resp, 'Cloudflare img2img')
+  }
 
   const model = process.env.CLOUDFLARE_IMAGE_MODEL || '@cf/leonardo/phoenix-1.0'
-  const resp = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, width, height }),
-    }
-  )
-  if (!resp.ok) {
-    const body = await resp.text().catch(() => '')
-    throw new Error(`Cloudflare ${resp.status}: ${body.slice(0, 200)}`)
-  }
-  const contentType = resp.headers.get('content-type') || 'image/jpeg'
-  // Cloudflare returns raw image bytes directly, not JSON-wrapped base64 —
-  // confirmed via a live curl test (response started with JPEG magic bytes).
-  const buffer = Buffer.from(await resp.arrayBuffer())
-  if (!buffer.length) throw new Error('Cloudflare returned an empty image body')
-  return `data:${contentType};base64,${buffer.toString('base64')}`
+  const resp = await fetch(run(model), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ prompt, width, height }),
+  })
+  return parseCloudflareImageResponse(resp, 'Cloudflare')
 }
 
 let _hf
@@ -210,6 +271,14 @@ const PROVIDERS = {
   cloudflare: viaCloudflare,
 }
 
+// Which providers can genuinely accept a reference image. Only Cloudflare, via
+// its SD 1.5 img2img model — every other provider function here only ever
+// reads {width, height, seed}, so passing a reference through unsupported
+// would be silently ignored rather than silently wrong, but "silently
+// ignored" is still a lie by omission for a feature the artist explicitly
+// asked for. generateImage() checks this and warns instead.
+const REFERENCE_CAPABLE = new Set(['cloudflare'])
+
 // Providers to fall back to, in order, when the primary fails for a reason that
 // retrying won't fix (exhausted quota / missing billing / missing key).
 // Ordered best-available-first. `together` sits ahead of `pollinations` because
@@ -223,8 +292,31 @@ const isUnrecoverable = (msg) =>
   /quota|limit: 0|RESOURCE_EXHAUSTED|billing|depleted|not set|permission|401|402|403|429/i.test(msg)
 
 /**
+ * Resolves a caller-supplied reference image (URL or already-base64) down to
+ * one base64 string, fetched exactly once here rather than per-provider, so
+ * every current and future provider function only ever deals with a plain
+ * string. Returns null on any failure — a bad reference URL must degrade the
+ * generation to "no reference", never fail the whole cover.
+ */
+async function resolveReferenceImage({ referenceImageUrl, referenceImageB64 }) {
+  if (referenceImageB64) return referenceImageB64
+  if (!referenceImageUrl) return null
+  try {
+    const resp = await fetch(referenceImageUrl)
+    if (!resp.ok) throw new Error(`fetch failed with ${resp.status}`)
+    const buffer = Buffer.from(await resp.arrayBuffer())
+    if (!buffer.length) throw new Error('empty response body')
+    return buffer.toString('base64')
+  } catch (err) {
+    console.warn(`[IMAGE] reference image could not be fetched, continuing without it: ${err?.message || err}`)
+    return null
+  }
+}
+
+/**
  * @param {string} prompt
- * @param {{ width?: number, height?: number, seed?: number, provider?: string }} [opts]
+ * @param {{ width?: number, height?: number, seed?: number, provider?: string,
+ *   referenceImageUrl?: string, referenceImageB64?: string, creativeStrength?: number }} [opts]
  * @returns {Promise<string>} base64 data URL
  */
 async function generateImage(prompt, opts = {}) {
@@ -233,7 +325,20 @@ async function generateImage(prompt, opts = {}) {
   if (!fn) throw new Error(`Unknown IMAGE_PROVIDER "${providerName}" (valid: ${Object.keys(PROVIDERS).join(', ')})`)
   const width = opts.width || 1024
   const height = opts.height || 1024
-  const args = { width, height, seed: opts.seed }
+
+  const referenceRequested = !!(opts.referenceImageUrl || opts.referenceImageB64)
+  let referenceImageB64 = null
+  if (referenceRequested) {
+    if (!REFERENCE_CAPABLE.has(providerName)) {
+      // Never silently drop a feature the artist explicitly asked for — a
+      // reference that quietly does nothing is worse than one that visibly
+      // didn't apply, because the artist has no way to notice the difference.
+      console.warn(`[IMAGE] a reference image was supplied but provider "${providerName}" cannot use one (only: ${[...REFERENCE_CAPABLE].join(', ')}) — generating without it.`)
+    } else {
+      referenceImageB64 = await resolveReferenceImage(opts)
+    }
+  }
+  const args = { width, height, seed: opts.seed, referenceImageB64, creativeStrength: opts.creativeStrength }
 
   try {
     return await fn(prompt, args)
@@ -247,7 +352,16 @@ async function generateImage(prompt, opts = {}) {
       if (alt === providerName) continue
       console.warn(`[IMAGE] "${providerName}" unavailable (${msg.slice(0, 120)}) → falling back to "${alt}"`)
       try {
-        return await PROVIDERS[alt](prompt, args)
+        // The fallback provider may not support a reference either (Pollinations
+        // does not) — re-check rather than carry a base64 payload that gets
+        // silently ignored a second time.
+        const altArgs = referenceImageB64 && !REFERENCE_CAPABLE.has(alt)
+          ? { ...args, referenceImageB64: null }
+          : args
+        if (referenceImageB64 && !REFERENCE_CAPABLE.has(alt)) {
+          console.warn(`[IMAGE] fallback "${alt}" also cannot use the reference image — generating without it.`)
+        }
+        return await PROVIDERS[alt](prompt, altArgs)
       } catch (altErr) {
         console.warn(`[IMAGE] fallback "${alt}" also failed: ${altErr?.message || altErr}`)
       }
@@ -256,4 +370,7 @@ async function generateImage(prompt, opts = {}) {
   }
 }
 
-module.exports = { generateImage, DEFAULT_PROVIDER }
+module.exports = {
+  generateImage, DEFAULT_PROVIDER, clampCreativeStrength, REFERENCE_STRENGTH_RANGE,
+  resolveReferenceImage, // exported for direct testing of the fetch-failure path
+}

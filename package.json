@@ -4,10 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node src/engine/__test.js",
+    "test": "node src/engine/__test.js && node src/utils/__test.js",
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "demo": "node src/engine/__demo.js"
+    "demo": "node src/engine/__demo.js",
+    "test:engine": "node src/engine/__test.js",
+    "test:utils": "node src/utils/__test.js"
   },
   "keywords": [],
   "author": "",

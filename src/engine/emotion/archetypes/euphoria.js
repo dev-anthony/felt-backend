@@ -1,44 +1,39 @@
 'use strict'
 /**
- * ARCHETYPE 10 — Euphoria, Ecstasy & Trance
+ * ARCHETYPE 10 — Euphoria, Ecstasy & Trance (The Visual Manifesto)
  *
- * Research Module 1. Visual directions are distilled from the research's
- * per-cell tables (lighting / colour / composition / texture) into one dense
- * phrase per Aesthetic State × Visual Intensity — 12 cells per archetype.
+ * The voice is that of a dancer dissolving on purpose — someone who has
+ * learned the self is a costume worth losing, and that a crowd, given
+ * enough rhythm, becomes a single organism breathing together. The point is
+ * never to be seen; it is to disappear into the pulse. Recurring vocabulary:
+ * dissolution, the shared pulse, the costume of self, the crowd-body,
+ * surrender. Anchor and motionBias are DEAM-calibrated and unchanged; only
+ * the twelve cells were rewritten.
  */
 module.exports = {
   label: 'Euphoria, Ecstasy & Trance',
   genres: 'EDM, Afrobeats, Amapiano, house, garage, synthpop, trance',
-  register: 'kinetic release and communal ecstasy — bodies moving, ego dissolving',
-  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
-  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
-  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
-  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
-  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
-  // rather than expressive, and uniformly penalised its archetype. Rescaled
-  // linearly: every archetype keeps its exact position relative to the others,
-  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
-  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
+  register: 'a dancer\'s dissolution — the self surrendered to a rhythm bigger than any one body',
   anchor: { danceability: 0.85, energy: 0.683, tempo: 0.6, motion: 0.85, euphoria: 0.7 },
   motionBias: 0.95,
   states: {
     normal: {
-      low: 'a twilight festival horizon bleeding into sunset, deep evening magenta and electric violet behind stage silhouettes, a wide perspective on distant festival structures, soft atmospheric heat haze in clear evening air',
-      medium: 'a dynamic camera pan holding motion blur, vibrant neon cyan bands cutting deep purple space, a panning shot fixing one dancer sharply against streaked ground, smooth background motion streaks over crisp facial detail',
-      high: 'a high-density concert laser array, intense laser green and hot pink lines through heavy haze, geometric laser grids cutting a deep dark room, thick artificial fog catching every directional beam',
-      extreme: 'long-exposure kinetic light painting, interlocking neon wire tracks around bright white cores, abstract spatial mapping of electronic light lines, fluid light tracks with all object weight eliminated',
+      low: 'Dissolution begins at the horizon, before the body even starts moving. Evening magenta bleeds into violet behind distant stage silhouettes, the wide frame holding a pulse the crowd has not yet answered.',
+      medium: 'One body separates from the crowd just long enough to be witnessed dissolving. A panning shot holds a dancer sharp against streaked neon cyan, motion blur turning everyone else into pure colour and rhythm.',
+      high: 'The pulse becomes visible once light starts moving faster than any single dancer could. Laser green and hot pink cut through heavy haze in geometric grids, the room itself now moving in time with the crowd-body.',
+      extreme: 'At full dissolution, the dancer disappears entirely into the light they were dancing inside. Long-exposure neon tracks interlock around bright cores, every trace of individual weight erased, the frame pure shared motion.',
     },
     luxury: {
-      low: 'hidden neon channels in a premium club lounge, soft ambient violet wash over deep dark concrete grey, a minimalist club interior framing a clean modern bar, flawless polished concrete and satin metal fixtures',
-      medium: 'saturated studio colour gels on a fashion profile, deep cyan key against intense magenta rim blocks, high-gloss framing holding the facial structure sharp, flawless gloss makeup under clean digital capture',
-      high: 'studio strobe firing off metallic mesh clothing, liquid silver mesh against crisp strobe points, a high-dynamic studio setup tracking reflective metal fabric, thousands of tiny mesh link reflections on clean paper',
-      extreme: 'high-frequency strobe on fluid mercury in macro, hyper-reflective liquid chrome under stark white strobe lines, an abstract macro study of moving liquid metal, frictionless fluid dynamics with micro surface lines',
+      low: 'Even a private surrender needs a room built to hold it. Soft violet wash settles over polished concrete in a minimalist lounge, the space quiet enough that dissolving here still feels like a choice.',
+      medium: 'The costume of self is easiest to shed under studio-grade colour. Deep cyan and magenta gels frame a face still sharp enough to recognise, gloss makeup catching light the instant before it lets go.',
+      high: 'Metal mesh moves the way skin does once the rhythm takes over completely. Liquid silver fabric catches strobe light mid-motion, thousands of small reflections standing in for a thousand small surrenders.',
+      extreme: 'The dancer\'s final costume is liquid metal with no fixed shape left to it. High-frequency strobes catch mercury mid-flow under stark white light, the abstraction complete, the self entirely, finally, dissolved.',
     },
     gritty: {
-      low: 'a single red laser line raking warehouse brick, crimson laser vectors through industrial brick dust brown, a low angle on an empty warehouse rave before the crowd, coarse old masonry and exposed conduit piping',
-      medium: 'an underground packed basement rave snapshot, saturated red light washing dark sweaty space, claustrophobic wide-angle framing deep inside the crowd, thick humidity on the walls and airborne sweat particles',
-      high: 'direct on-camera flash into crowd spray, overexposed skin highlights against airborne silver water, a fast snapshot freezing water thrown mid-air, frozen droplets under high-ISO digital noise',
-      extreme: 'a heavily overdriven chemical film burn, extreme cross-processed colour with solarized highlights, chaotic movement tracking absolute crowd ecstasy, physically melting film edges and severe silver-halide clumping',
+      low: 'A single laser line across brick is enough to start the dissolving. Crimson light rakes an empty warehouse before the crowd arrives, the low angle proof that the pulse begins before the body does.',
+      medium: 'The crowd-body forms fastest in rooms too packed to allow individual space. Saturated red light washes a basement rave, the wide angle immersing the frame entirely inside a shared, sweating organism.',
+      high: 'Water thrown skyward becomes the clearest picture of surrender a camera can freeze. Direct flash catches airborne droplets over an ecstatic crowd, each one a small, separate act of letting go.',
+      extreme: 'At its most consumed, the record of ecstasy starts destroying itself along with the dancer. Overdriven film burn solarises the frame, chaotic motion tracking absolute crowd dissolution until self and image collapse together.',
     },
   },
 }

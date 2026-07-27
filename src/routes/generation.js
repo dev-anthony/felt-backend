@@ -719,7 +719,15 @@ ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}`
 })
 
 router.post('/', requireAuth, async (req, res) => {
-  const { upload_id, lyric_context, technique: techniqueOverride } = req.body
+  const { upload_id, lyric_context, technique: techniqueOverride,
+    // Optional Task 4 reference-image workflow: an artist-supplied photo,
+    // moodboard crop or press shot the cover should draw its composition,
+    // palette and environment from. `creative_strength` (0..1) controls how
+    // much of the reference survives -- see imageProvider.js's viaCloudflare
+    // for the measured behaviour behind that number. Both are optional and
+    // safely no-op on providers that cannot use them.
+    reference_image_url, creative_strength,
+  } = req.body
   const userId = req.user.id
 
   if (!upload_id) {
@@ -803,7 +811,11 @@ router.post('/', requireAuth, async (req, res) => {
 
     let imagePayloadUrl
     try {
-      imagePayloadUrl = await generateImage(absoluteFluxPrompt, { width: 1024, height: 1024 })
+      imagePayloadUrl = await generateImage(absoluteFluxPrompt, {
+        width: 1024, height: 1024,
+        referenceImageUrl: reference_image_url || undefined,
+        creativeStrength: creative_strength,
+      })
     } catch (hfErr) {
       const detail = hfErr?.message || String(hfErr)
       console.error('[HF GENERATION EXCEPTION MATRIX CRASH]:', detail)
@@ -880,7 +892,7 @@ router.get('/:upload_id', requireAuth, async (req, res) => {
 })
 
 router.patch('/refine', requireAuth, async (req, res) => {
-  const { upload_id, lyric_context, image_url } = req.body;
+  const { upload_id, lyric_context, image_url, reference_image_url, creative_strength } = req.body;
   const userId = req.user.id;
 
   if (!upload_id) {
@@ -960,7 +972,11 @@ INPUT REFINEMENT VARIABLES:
 
     let imagePayloadUrl;
     try {
-      imagePayloadUrl = await generateImage(absoluteFluxRefinedPrompt, { width: 1024, height: 1024 });
+      imagePayloadUrl = await generateImage(absoluteFluxRefinedPrompt, {
+        width: 1024, height: 1024,
+        referenceImageUrl: reference_image_url || undefined,
+        creativeStrength: creative_strength,
+      });
     } catch (hfErr) {
       const detail = hfErr?.message || String(hfErr)
       console.error('❌ [HF REFINEMENT PIPELINE FAULT]:', detail);

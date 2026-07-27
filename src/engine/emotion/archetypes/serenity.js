@@ -1,44 +1,39 @@
 'use strict'
 /**
- * ARCHETYPE 2 — Serenity, Peacefulness & Meditativeness
+ * ARCHETYPE 2 — Serenity, Peacefulness & Meditativeness (The Visual Manifesto)
  *
- * Research Module 1. Visual directions are distilled from the research's
- * per-cell tables (lighting / colour / composition / texture) into one dense
- * phrase per Aesthetic State × Visual Intensity — 12 cells per archetype.
+ * The voice is that of a hermit who has come to believe that stillness is the
+ * only thing a person can truly own — that the more a scene is emptied, the
+ * more clearly it can be seen. Nothing here is achieved; everything is simply
+ * allowed to settle. Recurring vocabulary: stillness, emptying, surface,
+ * unclaimed space, the held breath, horizon, weightlessness. Anchor and
+ * motionBias are DEAM-calibrated and unchanged; only the twelve cells were
+ * rewritten.
  */
 module.exports = {
   label: 'Serenity, Peacefulness & Meditativeness',
   genres: 'New age, minimalist ambient, lo-fi chillhop, Celtic folk',
-  register: 'stillness and grounded calm — unhurried, weightless, settled',
-  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
-  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
-  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
-  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
-  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
-  // rather than expressive, and uniformly penalised its archetype. Rescaled
-  // linearly: every archetype keeps its exact position relative to the others,
-  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
-  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
+  register: 'a hermit\'s stillness — the world emptied until only calm is left standing',
   anchor: { energy: 0.156, tempo: 0.15, acousticness: 0.75, valence: 0.591, brightness: 0.3, speechiness: 0.08 },
   motionBias: 0.05,
   states: {
     normal: {
-      low: 'flat uniform overcast daylight, monochromatic soft greys and pale teal, a symmetrical horizontal horizon with the subject dead centre, glassy undisturbed water',
-      medium: 'soft diffused blue-hour light after sunset, pale lavender and deep twilight indigo over muted slate, rule of thirds across extensive empty space, fine atmospheric mist in low-contrast fields',
-      high: 'soft sunlight diffusing down through a dense forest canopy, deep moss green and earthen brown cut by filtered warm shafts, layered vertical elements holding structural quiet, soft forest-floor detritus behind an out-of-focus foreground',
-      extreme: 'shifting fields of light in the manner of a James Turrell installation, borderless gradients cycling through soft monochromatic tone, absolute abstraction with every literal object removed, frictionless sky-space of infinite depth',
+      low: 'The first paradox of stillness: a lake so undisturbed it feels louder than any wave could. Flat overcast light lays soft grey and pale teal across a symmetrical horizon, the surface glassy enough to hold the sky without asking anything of it.',
+      medium: 'Silence made visible — the blue hour after sunset, when the day has finished asking questions. Pale lavender fades into deep twilight indigo across a wide, uncluttered field, thin mist softening every edge that daylight would have sharpened.',
+      high: 'Deeper stillness requires deeper cover: a canopy the light must earn its way through. Filtered warm shafts cut through moss green and earthen brown, vertical trunks holding the frame quiet the way pillars hold a room, the floor beyond dissolving into soft, forgiving blur.',
+      extreme: 'The hermit\'s final teaching: stillness carried far enough stops being a place and becomes a colour. Borderless gradients shift through soft monochrome tone, every literal object dissolved, the frame opening into a sky with no measurable depth left to it.',
     },
     luxury: {
-      low: 'low-intensity hidden architectural accent light, pale stone grey and soft bone white against natural matte oak, hyper-clean geometric lines with nothing unnecessary in frame, matte limestone and raw unpolished quartz',
-      medium: 'diffused wash light falling across luxury materials, taupe and rich warm cream with soft unpolished bronze, asymmetrical framing built around high-end structural texture, fine linen weave and matte ceramic edges',
-      high: 'a single soft museum-grade spotlight picking out one element, deep espresso wood and dark emerald velvet trimmed in soft gold leaf, central isolation of one historical luxury object, aged leather grain and heavy unpolished brass',
-      extreme: 'perfect indirect lighting casting micro shadow lines, monochromatic white-on-white broken by raw silver, abstract macro on an architectural intersection point, flawless geometric crystal facets in absolute polish',
+      low: 'Wealth expressed as absence — a room so certain of itself it needs nothing extra to prove the point. Hidden light warms pale stone grey and soft bone white against matte oak, geometric lines left clean of anything that was not essential.',
+      medium: 'Restraint as its own material — taupe and warm cream meeting unpolished bronze in a room built around what it chose not to include. Diffused wash light settles across fine linen weave and matte ceramic, the asymmetry deliberate, unhurried, entirely at ease with itself.',
+      high: 'One object, fully attended to, becomes worth more than a room full of many. A single museum-grade spotlight isolates deep espresso wood and emerald velvet trimmed in soft gold leaf, aged leather grain the only history the frame permits itself to hold.',
+      extreme: 'The hermit\'s luxury, taken to its edge: white on white, until even colour has agreed to stop competing. Perfect indirect light casts the faintest shadow lines across raw silver, one structural intersection reduced to pure geometric crystal, flawless and entirely without weight.',
     },
     gritty: {
-      low: 'weak morning sun striking one unadorned wall, faded beige and flat eggshell white under natural grey shadow, a stationary eye-level camera in a casual unposed view, raw drywall with faint dust and exposed wires',
-      medium: 'overcast light passing through dirty window panes, muted industrial blue and ash grey against rusted iron trim, a frame within a frame looking outward into dead space, water-spot patterns on glass and rough raw wood grain',
-      high: 'low fog rolling across a damp unpaved country road, deep charcoal and slate grey over muddy earth tones, a disorienting low horizon line through soft-focus optics, damp asphalt and heavy atmospheric wetness',
-      extreme: 'a defocused night landscape lit only by distant streetlights, blurry multi-coloured bokeh fields against dark space, total lens defocus with the camera off-axis, heavy sensor dust and a high analog noise floor',
+      low: 'Even a neglected room can hold a kind of peace, if nothing in it is asked to perform. Weak morning sun finds one bare wall, faded beige and flat eggshell catching natural shadow, the camera stationary, unposed, content to simply witness.',
+      medium: 'Stillness does not require cleanliness — only the absence of demand. Overcast light filters through dirty glass, muted industrial blue meeting rusted iron trim, the frame looking outward through a window into dead, undemanding space.',
+      high: 'The world grows quieter the further it drifts from anyone\'s attention. Low fog rolls across an unpaved road, charcoal and slate settling over muddy earth, the horizon disoriented on purpose, soft focus letting the road disappear before it has to end.',
+      extreme: 'The hermit\'s last lesson in letting go: even focus is something that can be released. A night landscape dissolves into distant streetlight bokeh, the lens entirely defocused, camera off-axis, the frame content to hold nothing but colour and dark.',
     },
   },
 }

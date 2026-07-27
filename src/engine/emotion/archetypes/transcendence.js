@@ -1,44 +1,40 @@
 'use strict'
 /**
- * ARCHETYPE 1 — Transcendence, Awe & Sublimity
+ * ARCHETYPE 1 — Transcendence, Awe & Sublimity (The Visual Manifesto)
  *
- * Research Module 1. Visual directions are distilled from the research's
- * per-cell tables (lighting / colour / composition / texture) into one dense
- * phrase per Aesthetic State × Visual Intensity — 12 cells per archetype.
+ * The voice is that of a pilgrim who has stopped believing the self is the
+ * centre of anything. To this narrator, scale is a mercy: the smaller a
+ * person is made to look against the light, the vast, the ancient, the more
+ * clearly they can be seen at all. Awe is not decoration — it is evidence
+ * that something larger than the ego is still watching. Recurring
+ * vocabulary: threshold, ascent, vastness, offering, elevation, horizon,
+ * dwarfing. Anchor and motionBias are DEAM-calibrated and unchanged; only
+ * the twelve cells were rewritten.
  */
 module.exports = {
   label: 'Transcendence, Awe & Sublimity',
   genres: 'Gospel, choral, orchestral, cinematic, ambient, Indian ragas, post-rock',
-  register: 'awe and spiritual elevation — vast, humbling, lifted',
-  // Anchor calibrated against DEAM (1,802 songs, human valence/arousal ratings,
-  // CC-licensed; Aljanaki et al., PLOS ONE 2017). The original values sat on an
-  // intuitive 0..1 scale, but real music does not use its ends: DEAM puts 95% of
-  // songs inside valence 0.195..0.781 / arousal 0.156..0.797, and FELT's own valence
-  // formula can only emit 0.174..0.875 -- so an anchor at 0.08 was unreachable
-  // rather than expressive, and uniformly penalised its archetype. Rescaled
-  // linearly: every archetype keeps its exact position relative to the others,
-  // only the span changed. Measured effect: dead archetypes 1 -> 0, selection
-  // concentration (Gini) 0.598 -> 0.501 across the 1,802 songs.
+  register: 'a pilgrim\'s vertigo before something larger than the self — humbled, lifted, dwarfed into clarity',
   anchor: { valence: 0.682, energy: 0.507, acousticness: 0.6, brightness: 0.68, scaleMajor: 1, tempo: 0.35 },
   motionBias: 0.25,
   states: {
     normal: {
-      low: 'soft morning golden-hour light, warm whites and desaturated gold, vast sky filling the top two-thirds, clear air with faint haze',
-      medium: 'volumetric god-rays breaking through storm cloud, amber and deep sky blue, low angle looking up at one solitary element, dust motes in the beams',
-      high: 'hard directional backlight throwing a glowing rim, intense gold against deep navy shadow, ultra-wide with the figure dwarfed twenty to one, crisp foreground texture',
-      extreme: 'a blinding overexposed source consuming the centre, pure white and searing platinum, dead symmetry staring into the light, heavy bloom and lens flare',
+      low: 'A pilgrim\'s first paradox: the sky grows larger precisely as the self grows quiet. Soft morning gold spills across a horizon filling two-thirds of the frame, one small figure standing at its edge, already smaller than the light he came looking for.',
+      medium: 'Volumetric shafts break through cloud like a doorway that only opens from above, the vast made suddenly, briefly personal. Amber light falls on a solitary tree or figure far below, the low angle confessing that the ground has surrendered its claim to importance.',
+      high: 'Scale becomes a form of mercy — the wider the frame, the smaller the ego, the more room left for wonder. A hard rim of gold burns around a silhouette dwarfed twenty to one against a navy sky, crisp foreground detail insisting the moment is real, not imagined.',
+      extreme: 'The pilgrim reaches the threshold where sight becomes belief: a light too bright to look at directly, offering nothing back but itself. Pure white consumes the centre of the frame in perfect symmetry, the eye offered no escape but surrender.',
     },
     luxury: {
-      low: 'muted indirect architectural light, matte white and brushed champagne gold, extreme minimalism on a single structural curve, polished marble and bone china',
-      medium: 'a sharp spotlight on one object in chiaroscuro, obsidian black with gold leaf and ivory, rule of thirds against eighty percent negative space, polished lacquer and liquid gold',
-      high: 'hard editorial light with razor shadows, emerald and burgundy with metallic gold, asymmetric fashion crop on a structural silhouette, heavy velvet and silk sheen',
-      extreme: 'hyper-reflective high-gloss studio setup, liquid platinum and diamond white chrome, geometric abstraction in macro, frictionless surfaces with hyper-real micro-detail',
+      low: 'Elevation without ornament — the discipline of a room that refuses to compete with what it houses. Alabaster and brushed gold hold one unbroken curve in absolute minimalism, proving restraint can be its own form of reverence.',
+      medium: 'A single object raised to the status of relic simply by the attention paid to it. One spotlight finds one flawless surface in eighty percent black, gold leaf catching the only light left in the room, negative space doing the work of a cathedral ceiling.',
+      high: 'Grandeur staged as inheritance rather than excess — the pilgrim understands true luxury as what outlives its owner. Emerald and burgundy meet metallic gold across an asymmetrical silhouette, velvet and silk holding weight the way stone holds history.',
+      extreme: 'The final vanity: a surface so perfect it erases its own materiality, becoming pure light with no texture left to touch. Liquid platinum and diamond white collapse into geometric abstraction, the frame frictionless, the object indistinguishable from its own glow.',
     },
     gritty: {
-      low: 'harsh overhead fluorescent, uncorrected greenish-white over slate and industrial beige, off-centre with a tilted horizon, ISO-800 grain on rough concrete',
-      medium: 'one bare hanging bulb cutting deep eye shadow, industrial rust and washed denim over ash, tight crop on hands, peeling paint and dust on the lens',
-      high: 'brutal direct flash dropping the background to black, searing flash-white against asphalt black and blood red, aggressive wide-angle close-up, ISO-3200 noise and wet asphalt',
-      extreme: 'flickering strobe caught mid-flash, high-contrast black and white pushed two stops, fractured overlapping layers, heavy silver-halide grain and chemical marks',
+      low: 'Even in ruin, the light insists on arriving somewhere. Uncorrected fluorescent hum falls sideways across a tilted horizon, sickly green-white finding one small clear space in the wreck, proof that grace does not require permission to enter.',
+      medium: 'A single bulb in a condemned room becomes the last altar left standing. Harsh overhead light drops deep shadows across peeling paint and raw brick, the frame tight on hands or a face, dust catching the beam like incense in a church no one built on purpose.',
+      high: 'The pilgrim finds the sacred in what should have already been abandoned. Brutal on-camera flash drops the background to pure black, a wide-angle distortion pressing close on a face lit like a confession, wet asphalt behind it doubling as scripture.',
+      extreme: 'Faith at its most exposed: a strobe caught mid-flash, the image torn between revelation and collapse. High-contrast monochrome fractures the frame into overlapping planes, heavy grain and motion streaks proving the sacred was never meant to hold still.',
     },
   },
 }
