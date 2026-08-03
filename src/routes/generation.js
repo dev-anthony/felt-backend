@@ -726,7 +726,7 @@ router.post('/', requireAuth, async (req, res) => {
     // much of the reference survives -- see imageProvider.js's viaCloudflare
     // for the measured behaviour behind that number. Both are optional and
     // safely no-op on providers that cannot use them.
-    reference_image_url, creative_strength,
+    reference_image_url, reference_image_b64, creative_strength,
   } = req.body
   const userId = req.user.id
 
@@ -814,6 +814,7 @@ router.post('/', requireAuth, async (req, res) => {
       imagePayloadUrl = await generateImage(absoluteFluxPrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
+        referenceImageB64: reference_image_b64 || undefined,
         creativeStrength: creative_strength,
       })
     } catch (hfErr) {
@@ -892,7 +893,7 @@ router.get('/:upload_id', requireAuth, async (req, res) => {
 })
 
 router.patch('/refine', requireAuth, async (req, res) => {
-  const { upload_id, lyric_context, image_url, reference_image_url, creative_strength } = req.body;
+  const { upload_id, lyric_context, image_url, reference_image_url, reference_image_b64, creative_strength } = req.body;
   const userId = req.user.id;
 
   if (!upload_id) {
@@ -975,6 +976,7 @@ INPUT REFINEMENT VARIABLES:
       imagePayloadUrl = await generateImage(absoluteFluxRefinedPrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
+        referenceImageB64: reference_image_b64 || undefined,
         creativeStrength: creative_strength,
       });
     } catch (hfErr) {

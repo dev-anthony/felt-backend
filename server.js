@@ -43,7 +43,12 @@ app.use(
   })
 );
 
-app.use(express.json());
+// 12mb, not the 100kb default: a base64-encoded reference image (Task 4)
+// can run several MB even after client-side resizing. Every other route
+// still goes through this same parser -- raising it here is simpler and
+// safer than duplicating express.json() per-route, since the global
+// parser runs before any route-specific one could anyway.
+app.use(express.json({ limit: '12mb' }));
 app.use(cookieParser());
 
 // Routes
