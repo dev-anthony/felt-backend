@@ -121,7 +121,14 @@ function scaleIntensity(v) {
  * nudge so it corrects rather than overwrites.
  */
 const POSITIVE_CUES = /\b(upbeat|feel[- ]?good|joy|joyful|happy|celebrat\w*|party|fun|playful|bright|uplift\w*|triumph\w*|victory|sweet|love|romantic|vibe\w*|groove\w*)\b/i
-const KINETIC_CUES = /\b(danc\w*|dancefloor|dance[- ]?floor|move\w*|movement|motion|energy|energetic|bounce|bouncy|jump\w*|rave|club|sweaty|kinetic|gyrat\w*|shake|wine|whine|turn[- ]?up)\b/i
+// "energy"/"energetic" were removed from this list: they're the single most
+// generic intensity word in the language ("strong energy", "dark energy",
+// "anxious energy") and matched on almost any emotionally intense description
+// regardless of whether the song has anything to do with movement — a track
+// about straining to hold onto something got read as a dance cue purely
+// because the artist wrote "I feel strong energy". The remaining words are
+// all specifically about physical/kinetic movement, not intensity in general.
+const KINETIC_CUES = /\b(danc\w*|dancefloor|dance[- ]?floor|move\w*|movement|motion|bounce|bouncy|jump\w*|rave|club|sweaty|kinetic|gyrat\w*|shake|wine|whine|turn[- ]?up)\b/i
 const NEGATIVE_CUES = /\b(sad|sorrow|grief|griev\w*|lonely|loneliness|heartbreak|broken|pain\w*|hurt|cry\w*|tears|depress\w*|dark|empty|loss|lost|mourn\w*|regret)\b/i
 const CALM_CUES = /\b(calm|peace\w*|still\w*|quiet|serene|gentle|soft|slow|meditat\w*|reflect\w*|introspect\w*)\b/i
 

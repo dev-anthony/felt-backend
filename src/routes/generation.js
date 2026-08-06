@@ -31,6 +31,11 @@ const { genreLineage, subjectModeRule } = require('../config/artistProfile')
 // line buried among five technical ones, so it steered nothing.
 const { readEmotion, emotionalRegisterBlock } = require('../engine/emotion')
 const { buildFeatureVector } = require('../engine/dna/featureVector')
+// VISUAL METAPHOR LAYER — runs before the scene writer, see engine/metaphor
+// for why: without it, the scene writer defaults straight to the statistically
+// most common scene for the archetype/genre instead of an image specific to
+// this song.
+const { generateVisualMetaphors } = require('../engine/metaphor')
 
 /**
  * MATH-DRIVEN TECHNIQUE SELECTION.
@@ -112,7 +117,7 @@ const PERSON_SUBJECT_BLOCK = `SUBJECT CONSTRUCTION (choose WHO fits the song, an
 - DECIDE WHO belongs here — never default to a young woman. Vary gender every time (masculine, feminine, androgynous — don't repeat the same one across songs). Age stays in an 18-35 range (late teens through mid-30s) — do not depict children or elders. Vary build and cultural context freely within that range.
 - ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
 - SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
-- ONE or TWO distinctive markers so they look like SOMEBODY: a lined fade, box braids, locs, a durag, grey hair, a gap or gold tooth, a nose ring, a face or hand tattoo, expressive makeup, cultural jewellery, a signature hat.
+- IF a distinctive physical marker is genuinely suggested by THIS song's specific world, include ONE. Do not reach for a lined fade, a nose ring, a gold tooth or a durag as a default checklist — those are clichés, not a formula. Pull the marker (if any) from the song's own cultural and narrative context, or omit it entirely; omitting one is equally correct.
 - WARDROBE WITH WEIGHT: name the garment AND how the fabric behaves under gravity — "a heavy structured wool coat cinched at the waist, pooling over the hips", not "a red dress"; "an oversized drop-shoulder hoodie stacking sharply at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
 - Keep the person to a few vivid concrete facts. Do not list every feature — leave room for the world and the action.
 - BANNED words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish".
@@ -168,7 +173,7 @@ const MEDIUM_BRIEF = {
   },
 }
 
-function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person', technique } = {}) {
+function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person', technique, metaphor } = {}) {
   const M = MEDIUM_BRIEF[mediumFamily] || MEDIUM_BRIEF.photo
   const subjectBlock = subjectMode === 'absent' ? ABSENT_SUBJECT_BLOCK : PERSON_SUBJECT_BLOCK
   const techniqueName = TECHNIQUES[technique] ? technique : DEFAULT_TECHNIQUE
@@ -180,6 +185,11 @@ Everything you write must serve one goal: someone who has heard this song should
 An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it first and let it govern the frame — the register, the aesthetic world, the intensity tier, the MOVEMENT line, and above all the VISUAL DIRECTION line.
 - VISUAL DIRECTION names the lighting, palette, composition and texture this combination calls for. Treat it as the brief.
 - If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it there.
+${metaphor ? `
+VISUAL METAPHOR (MANDATORY — this is the image, not a suggestion):
+${metaphor}
+Build the entire scene around this image. It is the subject of the cover, not decoration inside it — do not replace it with a literal illustration of the artist's words or a generic scene for this genre. If a person appears, they are staged interacting with this image, not standing next to a version of it that could be swapped out. If the metaphor describes an object or material with no person in it, that is correct — do not add a figure just to have one.
+` : ''}
 
 LOCKED TECHNIQUE (already chosen mathematically from this track's emotion — do NOT choose a different one, do NOT mention its name or output a TECHNIQUE line):
 - ${techniqueName} — ${t.purpose}
@@ -188,13 +198,16 @@ LOCKED TECHNIQUE (already chosen mathematically from this track's emotion — do
 - Common mistake to avoid: ${t.commonMistakes}
 - Write the scene so this technique feels inevitable — the location, action and staging should be what a photographer would naturally reach for to shoot it this way.
 
-RELEVANCE MANDATE (this is the entire job):
-- The scene MUST be visibly, specifically about what THIS song is about. Stage the actual situation, place, person or moment the artist and the lyrics describe.
+RELEVANCE MANDATE (this is the entire job — read this before anything below it):
+- The artist's own words below are the PRIMARY source for the subject, place and action. Work out what physical situation actually embodies what they said — not the closest genre stereotype, not the most common interpretation, THIS specific thing.
+- Any example locations, props or imagery named further down in this brief are illustrations of a STYLE, never a menu. Do not default to one just because it is concrete and easy to reach for. If nothing on those lists fits what the artist actually described, ignore all of them and invent something that does.
+- A high tempo or high energy reading describes HOW FAST the song is, not WHAT IT IS ABOUT. Never let tempo/energy alone justify a location or an activity (a club, a party, dancing) that the artist's own words don't support.
 - Never fall back on a generic default (a lone figure in a dim room, someone staring out a rain-streaked window) unless the theme is literally that.
-- Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object.
+- Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object — derived from the artist's words, not assembled from this brief's example lists.
 
-DEPICTING CONNECTION, CHEMISTRY & DESIRE (CRITICAL — read carefully):
-Songs about attraction, chemistry, dancing with someone, or being wanted are extremely common, and there is a failure mode you must avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
+DEPICTING CONNECTION, CHEMISTRY & DESIRE — ONLY IF THE SONG IS LITERALLY ABOUT THIS:
+Apply this section ONLY when the song's actual subject is attraction, wanting someone, dancing with someone, or romantic/sexual chemistry. If the song is about something else — holding on to something slipping away, loss, resistance, ambition, grief, solitude, anger, defiance — IGNORE THIS SECTION ENTIRELY. A fast tempo or high energy reading is NOT the same thing as a song being about connection; do not reach for a club, a crowd, a dancefloor or generic "nightlife energy" imagery just because a track is fast or loud.
+When the song genuinely is about attraction/chemistry/desire, there is a failure mode to avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
 Instead, convey connection through ENERGY, MOTION and IMPLICATION:
 - The subject caught mid-dance — weight shifted, hips turned, hair and fabric still moving, feet off the beat.
 - An action that only makes sense because someone else is there: reaching toward the edge of frame, glancing back over a shoulder, laughing at something off-camera, pulling someone's hand that is just out of shot.
@@ -212,8 +225,8 @@ If your instinct produces one of these, discard it and write an action instead.
 ${subjectBlock}
 
 ENVIRONMENT & MOMENT (a cover is a PLACE and a MOMENT, not a floating portrait):
-- ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor". Name it: a smoky underground Afro-house club with polished concrete floors, a Lagos rooftop lounge just after midnight, a candle-lit jazz bar with amber practicals, a cracked tenement stairwell, a neon late-night diner, a dusty backyard party.
-- ONE or TWO intentional props that tell the story: a half-finished cocktail, a disco ball's scattered light, a velvet couch, a vintage microphone, drifting smoke, a cracked phone.
+- ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor". The location must be the one the artist's own words point to. Nightlife venues (a club, a lounge, a bar) are correct ONLY when the song is actually about a night out, a party or that kind of scene — most songs are not, and reaching for one by default is exactly the genericness this brief exists to prevent. For everything else, name whatever place the actual theme calls for: a kitchen at 3am, a stairwell, a bus stop, a hospital waiting room, a childhood bedroom, a parking lot, a field, a moving car, a rooftop, a laundromat — anywhere a real moment like this would actually happen.
+- ONE or TWO intentional props that tell the story, specific to THIS scene — not stock atmosphere props reached for by habit (a disco ball, a cocktail) unless the location genuinely is that kind of place.
 - Describe a MOMENT OF ACTION — what is HAPPENING. Caught mid-step, glancing back, laughing, adjusting a chain, leaning off a wall, stepping through smoke.
 - Match the AESTHETIC WORLD from the register block: Normal = grounded real places and natural materials; Luxury = premium materials, flawless surfaces, expensive light; Gritty = visible wear, real dirt and sweat, uncorrected light.
 - Match the INTENSITY tier: Low is restrained and quiet; Extra High consumes the frame.
@@ -230,7 +243,11 @@ STORY-ONLY RULE:
 
 OUTPUT FORMAT (CRITICAL):
 Respond with exactly one thing, nothing else — no label, no preamble, no quotes:
-<2-3 sentence cinematic moment grounded in this song, staged to suit the LOCKED TECHNIQUE above. Name a SPECIFIC location with atmosphere and one or two meaningful props; place a MEMORABLE, specific person inside it — whose gender, age and identity you chose to fit THIS song, with a distinctive marker and specific wardrobe; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No lyric excerpts.>`
+<2-3 sentence cinematic moment grounded in this song, staged to suit the LOCKED TECHNIQUE above. Name a SPECIFIC location with atmosphere and one or two meaningful props; ${
+    subjectMode === 'absent'
+      ? 'this cover has NO human figure — describe the object, material or place itself and what is physically happening to or around it (not a static object, something in motion or mid-change)'
+      : 'place a specific person inside it — whose gender, age and identity you chose to fit THIS song, with specific wardrobe and, only if it genuinely fits, one distinctive marker'
+  }; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No lyric excerpts.>`
 }
 
 /**
@@ -356,7 +373,7 @@ const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
       ? `Lineage: ${artistGenre}. Audio structural variables aligned to standard baseline frequencies.`
       : "Audio structural variables aligned to standard baseline frequencies.";
   }
-  const { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, mood, genre } = features;
+  const { bpm, key, scale, energy, valence, danceability, acousticness, spectral_brightness, loudness, genre } = features;
   const parts = [];
 
   parts.push(`Lineage: ${artistGenre || genre || 'Contemporary Sound'}`);
@@ -364,7 +381,12 @@ const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
   parts.push(`Energy Density: ${energy || 50}/100, Valence/Emotional Weight: ${valence || 50}/100`);
   parts.push(`Rhythm Matrix: Danceability ${danceability || 50}/100, Acousticness ${acousticness || 50}/100`);
   parts.push(`Spectral Profile: Brightness ${spectral_brightness || 50}/100, Loudness ${loudness || -6} dB`);
-  parts.push(`Kinetic Profile: Overarching ${mood || 'balanced'} acoustic state`);
+  // No "mood" line here on purpose: `features.mood` is a crude nearest-cluster
+  // label computed client-side (WorkspaceWizard.tsx's VECTOR_CLUSTERS), a
+  // completely separate classifier from the archetype-based EMOTIONAL REGISTER
+  // block (buildEmotionalRegister -> readEmotion) that always accompanies this
+  // text in the same prompt. Shipping both risked two disagreeing mood reads
+  // in one prompt — the LLM doesn't reconcile contradictions, it blends them.
 
   return parts.join('. ');
 };
@@ -392,7 +414,12 @@ async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '
 
 async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext, features }) {
   const technique = resolveTechnique(features, null, userInput)
-  const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(features), technique })}
+  const { metaphor } = await generateVisualMetaphors({
+    generate: geminiRawText,
+    userFeeling: userInput,
+    context: sonicFeatures,
+  })
+  const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(features), technique, metaphor })}
 
 INPUT MATRIX TO CONVERT:
 1. Artist's Core Feeling / What The Song Is About: "${userInput.trim()}"
@@ -491,8 +518,13 @@ router.post('/expand', requireAuth, async (req, res) => {
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
 const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
     const technique = resolveTechnique(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
+    const { metaphor } = await generateVisualMetaphors({
+      generate: geminiRawText,
+      userFeeling: basic_input,
+      context: emotionalRegister,
+    })
 
-    const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
+    const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -661,7 +693,12 @@ router.post('/transcribe', requireAuth, async (req, res) => {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
       const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
-      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
+      const { metaphor } = await generateVisualMetaphors({
+        generate: geminiRawText,
+        userFeeling: userVibeInput,
+        context: emotionalRegister,
+      })
+      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -675,7 +712,12 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
       const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId)
-      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
+      const { metaphor: metaphor2 } = await generateVisualMetaphors({
+        generate: geminiRawText,
+        userFeeling: `${userVibeInput}. ${distilledTheme}`,
+        context: emotionalRegister2,
+      })
+      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor: metaphor2 })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
@@ -800,7 +842,11 @@ router.post('/', requireAuth, async (req, res) => {
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
       useCompiler: req.body.use_compiler === true,
-      mood: upload.audio_features?.mood,
+      // No `mood` here on purpose — `upload.audio_features.mood` is the crude
+      // client-side VECTOR_CLUSTERS label, a second classifier independent of
+      // the archetype engine. Leaving this unset lets orchestrate() fall back
+      // to `dna.vector.meta.mood` (engine/index.js), the real signal, instead
+      // of shipping two disagreeing mood reads into one compiler prompt.
       noPeople: artistNoPeople,
     })
 
@@ -937,7 +983,13 @@ router.patch('/refine', requireAuth, async (req, res) => {
       ? existingBrief.technique
       : resolveTechnique(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest)
 
-    const refinementPrompt = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique })}
+    const { metaphor: refineMetaphor } = await generateVisualMetaphors({
+      generate: geminiRawText,
+      userFeeling: modRequest || existingBrief?.scene || '',
+      context: trackSonicFeatures,
+    })
+
+    const refinementPrompt = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor: refineMetaphor })}
 ${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
 You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — the technique above is LOCKED; write a new staging that suits it.
 
@@ -962,7 +1014,9 @@ INPUT REFINEMENT VARIABLES:
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
       useCompiler: req.body.use_compiler === true,
-      mood: upload.audio_features?.mood,
+      // See the matching comment in the POST / handler above — deliberately no
+      // `mood` here, so orchestrate() falls back to the archetype engine's own
+      // read instead of the crude client-side classifier.
       noPeople: refineNoPeople,
     });
 
