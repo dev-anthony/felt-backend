@@ -98,9 +98,26 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
   // scored, so a Gritty/Luxury world and a High/Low intensity actually change
   // WHICH vocabulary wins rather than only what the prompt text says. Applied
   // before the technique bias so an explicit art direction still has the last
-  // word. Deterministic: derived purely from the same features.
-  const emotion = readEmotion(vector, vector.meta.genre, '')
-  const biased = applyTechniqueBias(applyBias(vector, emotionDnaBias(emotion)), technique)
+  // word.
+  //
+  // `intentText` used to be hardcoded to '' here, which silently discarded the
+  // semantic-correction layer for this entire call — a track described as "I
+  // feel hope, everything is gonna be alright" got its VALENCE CORRECTED for
+  // technique selection (resolveTechnique, elsewhere) but the graphic/color/
+  // lighting/composition choices made right here still scored against the raw,
+  // uncorrected audio valence, because this function re-derives its own emotion
+  // read from scratch instead of receiving the corrected one. A real generation
+  // ended up with `graphic_panel_grid` (anchored for low-valence, gritty,
+  // aggressive tracks — "a mugshot-style lineup") on a song about hope, purely
+  // because this one call never saw the words that corrected the read
+  // everywhere else. Passing the same text through here closes that split.
+  const emotion = readEmotion(vector, vector.meta.genre, opts.intentText || '')
+  // `emotion.correctedVector` is what readEmotion() actually corrected against
+  // intentText (valence/motion/danceability/energy) — bias from the ORIGINAL
+  // `vector` here would silently discard that correction a second time, right
+  // after the previous fix went to the trouble of letting intentText reach
+  // this function at all. This is the vector every layer below scores against.
+  const biased = applyTechniqueBias(applyBias(emotion.correctedVector, emotionDnaBias(emotion)), technique)
 
   // Module 3 axes this track has no real measurement for. Excluded from
   // scoring so a legacy track cannot earn points on evidence it never had.
@@ -143,6 +160,44 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
     if (layer.key === 'artMedium' && opts.mediumFamily) {
       const inFamily = candidates.filter((c) => conceptMediumFamily(c) === opts.mediumFamily)
       if (inFamily.length) candidates = inFamily
+    }
+
+    // GRAPHIC/MEDIUM AGREEMENT.
+    // `graphic` scores independently of `artMedium` with no cross-check, and a
+    // real generation surfaced the result: artMedium picked `medium_screenprint`
+    // ("a bold screen-print with flat color blocking and halftone dots") while
+    // graphic independently picked `graphic_clean_photo` ("presented as a
+    // straight photograph with no graphic overlay") — a screen-print declared
+    // to be a straight photograph in the same sentence. Unlike artMedium, most
+    // `graphic` concepts (parental-advisory stamp, vinyl sleeve framing, collage,
+    // minimal-luxury layout) are genuinely medium-agnostic and must stay
+    // eligible everywhere — only the few that make an explicit competing medium
+    // claim need excluding, not the whole category.
+    if (layer.key === 'graphic' && opts.mediumFamily) {
+      const compatible = candidates.filter((c) => {
+        const t = c.tags || []
+        if (t.includes('photographic') && opts.mediumFamily !== 'photo') return false
+        if (t.includes('risograph') && opts.mediumFamily === 'photo') return false
+        return true
+      })
+      if (compatible.length) candidates = compatible
+    }
+
+    // TONAL AGREEMENT.
+    // `graphic_panel_grid`'s anchor is { grit: 0.55, aggression: 0.55, energy:
+    // 0.55, valence: 0.4 } — four dimensions, only one of which (valence) the
+    // semantic-correction layer ever touches. A track described as "I feel
+    // hope, everything's gonna be alright" gets its valence corrected from
+    // 0.48 to 0.78, but that alone isn't enough to outweigh a grit/aggression/
+    // energy match, so a "mugshot-style lineup" — a specifically negative,
+    // institutional image — still won on a genuinely hopeful track. No amount
+    // of sonic grit makes a police-booking-photo layout the right read for
+    // "everything is gonna be alright", so this excludes it outright once the
+    // corrected valence is clearly positive, rather than leaving it to an
+    // anchor-score tug-of-war it can still win on other axes.
+    if (layer.key === 'graphic' && biased.valence >= 0.65) {
+      const tonal = candidates.filter((c) => !(c.tags || []).includes('mugshot'))
+      if (tonal.length) candidates = tonal
     }
 
     // NO-PEOPLE AGREEMENT.

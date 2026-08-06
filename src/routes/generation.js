@@ -350,7 +350,7 @@ async function buildFinalPrompt(technique, scene, features, { useCompiler = fals
       })
       return { prompt: result.prompt, technique: result.technique, dna: result.dna }
     }
-    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene, noPeople, mediumFamily })
+    const built = engine.assembleFromScene({ features, techniqueName: technique, sceneText: scene, noPeople, mediumFamily, intentText: userFeeling || scene })
     return { prompt: built.prompt, technique: built.technique, dna: built.dna }
   } catch (err) {
     console.warn(`[ENGINE] Visual DNA build failed, using legacy prompt: ${err?.message || err}`)

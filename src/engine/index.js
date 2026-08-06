@@ -32,12 +32,15 @@ const DETERMINISTIC_SYMBOLISM_MIN_CONFIDENCE = 0.6
  * upstream) becomes the story; the DNA supplies every visual/technical block.
  * @returns {import('./types').AssembledPrompt}
  */
-function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna, noPeople = false, mediumFamily }) {
+function assembleFromScene({ features, techniqueName, sceneText, dna: providedDna, noPeople = false, mediumFamily, intentText }) {
   // noPeople also has to reach DNA selection itself, not just the assembler —
   // otherwise the graphic layer can still pick a portrait-framing concept
   // (e.g. "mugshot-style lineup") on a cover the scene/metaphor already
-  // decided has no person in it.
-  const dna = providedDna || computeVisualDNA(features, techniqueName, { mediumFamily, noPeople })
+  // decided has no person in it. Same reasoning for intentText: without it,
+  // computeVisualDNA re-derives its own emotion read from raw audio alone,
+  // discarding whatever the artist's words already corrected (e.g. "hope"
+  // pulling valence up) for technique selection elsewhere.
+  const dna = providedDna || computeVisualDNA(features, techniqueName, { mediumFamily, noPeople, intentText })
   // The scene sentence already contains the subject AND the setting (it is the
   // whole story), so we do NOT inject the DNA subject archetype — doing so would
   // describe two different people in one prompt. The DNA supplies only the look.
@@ -69,7 +72,7 @@ function assembleFromScene({ features, techniqueName, sceneText, dna: providedDn
  * @returns {Promise<import('./types').AssembledPrompt & { compilerFallback: boolean }>}
  */
 async function orchestrate({ generate, features, techniqueName, userFeeling, lyricsTheme, mood, fallbackScene, noPeople = false }) {
-  const dna = computeVisualDNA(features, techniqueName, { noPeople })
+  const dna = computeVisualDNA(features, techniqueName, { noPeople, intentText: userFeeling })
   const { blueprint, fallback } = await compileScene({
     generate,
     technique: dna.technique,
