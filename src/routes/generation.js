@@ -104,6 +104,9 @@ function deserializeBrief(stored, features) {
       return {
         technique: TECHNIQUE_SUFFIXES[parsed.technique] ? parsed.technique : fallbackTechnique(),
         scene: parsed.scene,
+        // Whether the winning metaphor needed a person, from when this brief
+        // was written — null (unknown) for briefs saved before this existed.
+        hasPerson: typeof parsed.hasPerson === 'boolean' ? parsed.hasPerson : null,
         structured: true,
       }
     }
@@ -380,8 +383,8 @@ async function generateSafeScene(promptText, options) {
   return { scene }
 }
 
-function serializeBrief(technique, scene) {
-  return JSON.stringify({ technique, scene })
+function serializeBrief(technique, scene, hasPerson = null) {
+  return JSON.stringify({ technique, scene, hasPerson })
 }
 
 const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
@@ -446,10 +449,10 @@ ${artistContext ? `4. Artist Branding Space Context: ${artistContext}` : ''}`;
 
   try {
     const { scene } = await generateSafeScene(promptText, { fallbackScene: userInput.trim() })
-    return { technique, scene }
+    return { technique, scene, hasPerson }
   } catch (err) {
     console.error(`⚠️ Scene brief synthesis fallback triggered: ${err?.message || err}`)
-    return { technique, scene: userInput.trim() }
+    return { technique, scene: userInput.trim(), hasPerson }
   }
 }
 
@@ -562,7 +565,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
 
     await supabase
       .from('uploads')
-      .update({ sentence_prompt: serializeBrief(technique, scene) })
+      .update({ sentence_prompt: serializeBrief(technique, scene, hasPerson) })
       .eq('id', upload_id)
 
     return res.status(200).json({
@@ -705,10 +708,11 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     // so far — both branches below write a scene for the SAME technique.
     const technique = resolveTechnique(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
     let promptText = '';
+    let resolvedHasPerson = null;
 
     if (!lyricsText || !lyricsText.trim()) {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
-      
+
       const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
       const { metaphor, hasPerson } = await generateVisualMetaphors({
         generate: geminiRawText,
@@ -724,6 +728,7 @@ VOCAL CONTEXT RULE: This song contains VOCALS, not an instrumental track. Fully 
 Artist input text: "${userVibeInput.trim()}"
 Audio context variables: ${trackSonicFeatures}
 ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
+      resolvedHasPerson = hasPerson;
     } else {
       console.log(`[TRANSCRIPTION SUCCESS] Lyrics resolved via ${source}. Distilling structure.`);
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
@@ -741,6 +746,7 @@ INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is ab
 2. What This Song Is About (concrete brief distilled from the lyrics — stage THIS): "${distilledTheme}"
 3. Track Sonic Profile Features: ${trackSonicFeatures}
 ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}` : ''}`;
+      resolvedHasPerson = hasPerson2;
     }
 
     let scene
@@ -759,7 +765,7 @@ ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}`
 
     await supabase
       .from('uploads')
-      .update({ sentence_prompt: serializeBrief(technique, scene) })
+      .update({ sentence_prompt: serializeBrief(technique, scene, resolvedHasPerson) })
       .eq('id', upload_id)
 
     return res.status(200).json({
@@ -826,15 +832,25 @@ router.post('/', requireAuth, async (req, res) => {
     )
 
     let technique, scene
+    // Whether the winning metaphor needed a person, carried over from whichever
+    // /expand or /transcribe call originally wrote this scene — null if that
+    // metaphor call never ran or produced nothing usable, in which case
+    // `noPeople` below just falls back to the artist's profile setting.
+    let resolvedHasPerson = null
 
     if (lyric_context) {
       scene = lyric_context.trim()
+      // Fetched regardless of whether a technique override is used below —
+      // this scene text is the SAME one /expand or /transcribe already wrote a
+      // metaphor for, so that metaphor's hasPerson is still the right subject
+      // decision for it even when the artist overrides the technique.
+      const storedBrief = deserializeBrief(upload.sentence_prompt, upload.audio_features)
+      resolvedHasPerson = storedBrief ? storedBrief.hasPerson : null
       if (TECHNIQUE_SUFFIXES[techniqueOverride]) {
         // Explicit user override — a real feature, not Gemini randomness, so
         // it's kept as-is.
         technique = techniqueOverride
       } else {
-        const storedBrief = deserializeBrief(upload.sentence_prompt, upload.audio_features)
         technique = (storedBrief && storedBrief.structured)
           ? storedBrief.technique
           : resolveTechnique(upload.audio_features, genreLineage(artistProfile.default_genre), lyric_context)
@@ -843,8 +859,9 @@ router.post('/', requireAuth, async (req, res) => {
       const storedBrief = deserializeBrief(upload.sentence_prompt)
       if (storedBrief && storedBrief.structured) {
         ;({ technique, scene } = storedBrief)
+        resolvedHasPerson = storedBrief.hasPerson
       } else {
-        ;({ technique, scene } = await synthesizeSceneBrief({
+        ;({ technique, scene, hasPerson: resolvedHasPerson } = await synthesizeSceneBrief({
           userInput: storedBrief ? storedBrief.scene : 'Abstract intense emotion',
           lyrics: '',
           sonicFeatures: trackSonicFeatures,
@@ -864,7 +881,9 @@ router.post('/', requireAuth, async (req, res) => {
       // the archetype engine. Leaving this unset lets orchestrate() fall back
       // to `dna.vector.meta.mood` (engine/index.js), the real signal, instead
       // of shipping two disagreeing mood reads into one compiler prompt.
-      noPeople: artistNoPeople,
+      // The artist's profile setting is a hard "always no people" override;
+      // otherwise defer to the metaphor's own decision for THIS cover.
+      noPeople: artistNoPeople || resolvedHasPerson === false,
     })
 
     const generationId = crypto.randomUUID()
@@ -1034,7 +1053,10 @@ INPUT REFINEMENT VARIABLES:
       // See the matching comment in the POST / handler above — deliberately no
       // `mood` here, so orchestrate() falls back to the archetype engine's own
       // read instead of the crude client-side classifier.
-      noPeople: refineNoPeople,
+      // The artist's profile setting is a hard "always no people" override;
+      // otherwise defer to the metaphor freshly generated above for this
+      // refined scene (not the stale one on the pre-refine brief).
+      noPeople: refineNoPeople || refineHasPerson === false,
     });
 
     const generationId = crypto.randomUUID();
@@ -1092,7 +1114,7 @@ INPUT REFINEMENT VARIABLES:
       .from('uploads')
       .update({
         status: 'complete',
-        sentence_prompt: serializeBrief(technique, scene)
+        sentence_prompt: serializeBrief(technique, scene, refineHasPerson)
       })
       .eq('id', upload_id);
 

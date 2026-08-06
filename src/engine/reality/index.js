@@ -113,7 +113,21 @@ function photographicRealityTail({
 
 // Illustration mediums get realism of a different kind — tactile handmade print,
 // not photographic anatomy — but still need the AI-tell negatives.
-function illustrationRealityTail() {
+//
+// `noPeople` was previously accepted by `photographicRealityTail` only — this
+// tail unconditionally said "natural human proportions and correct hands" even
+// on a cover whose scene, metaphor and DNA all agreed there was no person in
+// it, which is a direct instruction for the model to render hands regardless.
+function illustrationRealityTail({ noPeople = false } = {}) {
+  if (noPeople) {
+    return (
+      'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+      'Handmade print aesthetic with visible tactile ink, paper grain and registration imperfection. ' +
+      'No people at all in the frame — no person, figure, silhouette, body part or hands. ' +
+      'Absolutely no ' + REALITY_NEGATIVES.join(', ') + '. ' +
+      'No text, letters, watermarks or logos rendered anywhere in the image.'
+    )
+  }
   return (
     'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
     'Handmade print aesthetic with visible tactile ink, paper grain and registration imperfection, ' +
@@ -129,7 +143,18 @@ function illustrationRealityTail() {
 // photographic tail either (no film grain, no lens dust, no analog imperfection).
 // What makes CGI read as expensive rather than cheap is physically-based
 // rendering: correct light transport, real material response, clean geometry.
-function cgiRealityTail() {
+function cgiRealityTail({ noPeople = false } = {}) {
+  if (noPeople) {
+    return (
+      'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
+      'Physically-based rendering with accurate light transport, true reflection and refraction, ' +
+      'correct material roughness and metalness response, clean topology with no distorted geometry. ' +
+      'No people at all in the frame — no person, figure, silhouette, body part or hands. ' +
+      'Absolutely no waxy plastic surfaces, warped geometry, duplicated or fused objects, ' +
+      'no film grain, no paper texture, no analog light leaks. ' +
+      'No text, letters, watermarks or logos rendered anywhere in the image.'
+    )
+  }
   return (
     'A definitive 1:1 square single cover for streaming, edge to edge, no frame or border. ' +
     'Physically-based rendering with accurate light transport, true reflection and refraction, ' +

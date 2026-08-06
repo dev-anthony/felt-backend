@@ -157,8 +157,8 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
           seed: dna.vector.meta.seed,
         })
       : family === 'cgi'
-        ? cgiRealityTail()
-        : illustrationRealityTail(),
+        ? cgiRealityTail({ noPeople })
+        : illustrationRealityTail({ noPeople }),
   ]
 
   const prompt = blocks.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()

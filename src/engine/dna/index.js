@@ -145,6 +145,35 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
       if (inFamily.length) candidates = inFamily
     }
 
+    // NO-PEOPLE AGREEMENT.
+    // `graphic_panel_grid` ("a mugshot-style lineup or stacked-portrait grid")
+    // was winning on tracks the metaphor/scene had already decided were
+    // people-free — a real generation ended up with that portrait-grid
+    // framing plus "correct hands" in the reality tail on a cover about a
+    // mooring rope with no person anywhere in the scene. The graphic layer has
+    // no technique affinity to filter through (see the comment above), so it
+    // needs its own guard: when the caller says this cover has no person,
+    // concepts explicitly tagged for portraiture are excluded from selection
+    // entirely rather than merely discouraged.
+    if (layer.key === 'graphic' && opts.noPeople) {
+      const peopleFree = candidates.filter((c) => !(c.tags || []).includes('mugshot'))
+      if (peopleFree.length) candidates = peopleFree
+    }
+
+    // Same reasoning applies to symbolism — `sym_hands` ("a close study of one
+    // pair of hands at rest") and `sym_crowd_surge` ("many raised arms filling
+    // the frame") are symbols where a body part IS the entire image, not a
+    // reference that can be reworded onto an object the way a lighting
+    // fragment can. No sensible object-only version of "a pair of hands"
+    // exists, so these are excluded rather than rewritten.
+    if (layer.key === 'symbolism' && opts.noPeople) {
+      const peopleFree = candidates.filter((c) => {
+        const t = c.tags || []
+        return !t.includes('hands') && !t.includes('bodies')
+      })
+      if (peopleFree.length) candidates = peopleFree
+    }
+
     const { selection } = selectConcept(candidates.length ? candidates : all, biased, {
       technique,
       explore: layer.explore,
@@ -165,6 +194,17 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
     const concept = getConcept(chosen.conceptId)
     const staged = concept && concept.staging && concept.staging[emotion.state]
     if (staged) chosen.fragment = staged
+
+    // NO-PEOPLE AWARE FRAGMENTS.
+    // A handful of technique-locked concepts (infrared's "faces reading as
+    // thermal blooms rather than lit skin", etc.) describe how the technique
+    // renders a PERSON specifically. On a no-people cover that reference has
+    // nothing to point at, so concepts that declare `noPeopleFragment` swap in
+    // their own creative read of the same technique applied to whatever IS in
+    // frame instead — the technique doesn't disappear, it just stops assuming
+    // a face. Concepts without one are untouched (most don't mention a person
+    // at all and don't need this).
+    if (opts.noPeople && concept && concept.noPeopleFragment) chosen.fragment = concept.noPeopleFragment
 
     selections[layer.key] = chosen
     fragments[layer.key] = chosen.fragment

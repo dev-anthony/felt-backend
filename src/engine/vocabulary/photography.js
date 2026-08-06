@@ -59,6 +59,7 @@ const LENSES = [
     techniques: ['MOTION_BLUR_STROBE', 'MACRO_INTIMATE_DETAIL'] },
   { id: 'lens_85mm_portrait', category: 'lens', tags: ['portrait', 'telephoto', 'bokeh', 'flattering'],
     fragment: '85mm portrait lens at f/1.4, shallow depth of field, creamy background bokeh and flattering facial compression',
+    noPeopleFragment: '85mm portrait lens at f/1.4, shallow depth of field, creamy background bokeh compressing the object\'s own surface detail into sharp, isolated focus',
     anchor: { intimacy: 0.55, warmth: 0.5, valence: 0.5, brightness: 0.5 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL', 'MACRO_INTIMATE_DETAIL', 'DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE'],
     source: 'research: /PROMT reference — 85mm, soft bokeh, shallow DOF editorial portrait' },
@@ -105,6 +106,7 @@ const LENSES = [
 const FILM_STOCKS = [
   { id: 'film_portra_400', category: 'filmStock', tags: ['warm', 'natural-skin', 'analog'],
     fragment: 'Kodak Portra 400 color rendition with warm, true skin tones',
+    noPeopleFragment: 'Kodak Portra 400 color rendition with warm, true-to-life tones across every material in frame',
     anchor: { warmth: 0.7, acousticness: 0.55, valence: 0.6 },
     techniques: ['VINTAGE_FILM_NOSTALGIA'] },
   { id: 'film_cinestill_800t', category: 'filmStock', tags: ['tungsten', 'night', 'halation'],
@@ -142,26 +144,32 @@ const FILM_STOCKS = [
 const LIGHTING = [
   { id: 'light_direct_flash', category: 'lighting', tags: ['flash', 'hard', 'overexposed'],
     fragment: 'direct on-camera flash, slightly overexposed skin highlights, a hard-edged shadow cast on the wall behind, a small specular catchlight in the eyes',
+    noPeopleFragment: 'direct on-camera flash, slightly overexposed highlights on the object\'s own surface, a hard-edged shadow cast on the wall behind, a small specular catchlight at its brightest point',
     anchor: { grit: 0.7, aggression: 0.6, energy: 0.7, euphoria: 0.5 },
     techniques: ['FLASH_DOCUMENTARY', 'STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'light_chiaroscuro', category: 'lighting', tags: ['low-key', 'dramatic', 'contrast', 'rim'],
     fragment: 'low-key chiaroscuro: a single soft key at 45 degrees that clearly lights and reveals the face and eyes, shadow falling off toward the far cheek, a thin rim light separating the subject from a near-black background, a catchlight in the eyes',
+    noPeopleFragment: 'low-key chiaroscuro: a single soft key at 45 degrees that clearly lights and reveals the object\'s form and texture, shadow falling off across its far side, a thin rim light separating it from a near-black background, a catchlight on its brightest edge',
     anchor: { darkness: 0.75, valence: 0.25, intimacy: 0.55 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'SURREAL_PRACTICAL_METAPHOR', 'DUOTONE_COLOR_WASH'] },
   { id: 'light_high_key_wrap', category: 'lighting', tags: ['high-key', 'soft', 'bright'],
     fragment: 'a large soft key from camera-left with gentle fill for an airy high-key wrap, clean bright reflections and soft catchlights in the eyes',
+    noPeopleFragment: 'a large soft key from camera-left with gentle fill for an airy high-key wrap, clean bright reflections and soft catchlights across the object\'s own surface',
     anchor: { euphoria: 0.7, brightness: 0.75, valence: 0.7 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'light_golden_hour', category: 'lighting', tags: ['warm', 'natural', 'directional'],
     fragment: 'warm low golden-hour sun raking across the subject from the side, long soft shadows and a warm catchlight in the eyes',
+    noPeopleFragment: 'warm low golden-hour sun raking across the object from the side, long soft shadows and a warm catchlight along its brightest edge',
     anchor: { warmth: 0.75, valence: 0.65, brightness: 0.6 },
     techniques: ['VINTAGE_FILM_NOSTALGIA', 'MONUMENTAL_SCALE_ISOLATION'] },
   { id: 'light_north_window', category: 'lighting', tags: ['soft', 'diffuse', 'natural'],
     fragment: 'soft diffused north-window daylight from camera-left, gentle wrap-around shadows and a soft catchlight in the eyes',
+    noPeopleFragment: 'soft diffused north-window daylight from camera-left, gentle wrap-around shadows and a soft catchlight on the object\'s most reflective point',
     anchor: { intimacy: 0.6, acousticness: 0.6, energy: 0.35 },
     techniques: ['MACRO_INTIMATE_DETAIL', 'VINTAGE_FILM_NOSTALGIA'] },
   { id: 'light_rim_backlight', category: 'lighting', tags: ['rim', 'backlight', 'silhouette'],
     fragment: 'a strong rim/edge backlight tracing the subject against a hazy background, plus a soft frontal fill that keeps the face clearly lit and readable',
+    noPeopleFragment: 'a strong rim/edge backlight tracing the object\'s silhouette against a hazy background, plus a soft frontal fill that keeps its form clearly lit and readable',
     anchor: { darkness: 0.6, intimacy: 0.4, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'MONUMENTAL_SCALE_ISOLATION'] },
   { id: 'light_spotlight_halo', category: 'lighting', tags: ['spotlight', 'projection', 'halo', 'circular', 'gel'],
@@ -169,11 +177,13 @@ const LIGHTING = [
     // reference's orange — the hue comes from the color DNA layer, and the front
     // key keeps the face lit rather than silhouetting it.
     fragment: 'a gelled key colored to the scene palette lighting the face clearly from the front, a circular spotlight projected on the wall behind the head forming a glowing halo disc in that same colour, a soft rim light and a bright catchlight in the eyes',
+    noPeopleFragment: 'a gelled key colored to the scene palette lighting the object clearly from the front, a circular spotlight projected on the wall behind it forming a glowing halo disc in that same colour, a soft rim light and a bright catchlight on its highest point',
     anchor: { darkness: 0.5, valence: 0.4, intimacy: 0.5, brightness: 0.4 },
     techniques: ['SILHOUETTE_ATMOSPHERE', 'STUDIO_SEAMLESS_EDITORIAL', 'DUOTONE_COLOR_WASH'],
     source: 'research: /PROMT + Tems sun-orb halo — concept (projected halo + gel + rim + catchlight), hue left to palette, face kept lit' },
   { id: 'light_practical_haze', category: 'lighting', tags: ['practical', 'club', 'haze', 'volumetric', 'night'],
     fragment: 'glowing practical bulbs behind the subject, one soft key from camera-left clearly lighting the face, atmospheric haze catching volumetric light beams, an edge light tracing the figure',
+    noPeopleFragment: 'glowing practical bulbs behind the object, one soft key from camera-left clearly lighting its surface, atmospheric haze catching volumetric light beams, an edge light tracing its silhouette',
     anchor: { darkness: 0.55, motion: 0.5, intimacy: 0.45 },
     techniques: ['DUOTONE_COLOR_WASH', 'SILHOUETTE_ATMOSPHERE', 'FLASH_DOCUMENTARY'],
     source: 'research: nightlife practical + volumetric haze lighting diagram' },
@@ -183,6 +193,9 @@ const LIGHTING = [
     techniques: ['DUOTONE_COLOR_WASH'] },
   { id: 'light_infrared_sensor', category: 'lighting', tags: ['infrared', 'thermal', 'false-color', 'night-vision'],
     fragment: 'no visible-spectrum lighting at all — heat and infrared signature render the scene, faces reading as false-color thermal blooms rather than lit skin',
+    // See color_infrared_false — same reasoning, this concept's own creative
+    // read of the technique for a scene with no face to bloom in false color.
+    noPeopleFragment: 'no visible-spectrum lighting at all — heat and infrared signature render the scene, the object\'s own warmth reading as a false-color thermal bloom against a cold ambient field rather than any lit surface',
     anchor: { darkness: 0.75, aggression: 0.5, valence: 0.15, brightness: 0.3 },
     techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]
@@ -254,6 +267,7 @@ const TEXTURE = [
     techniques: ['VINTAGE_FILM_NOSTALGIA'] },
   { id: 'tex_clean_detail', category: 'texture', tags: ['clean', 'detail', 'pores'],
     fragment: 'pristine sensor clarity resolving real un-airbrushed skin pores and textile weave',
+    noPeopleFragment: 'pristine sensor clarity resolving the object\'s own real material grain — wood pore, metal brush marks, fabric weave, worn edges',
     // Module 3 #7 - low onset density produces hyper-clean, barren spaces.
     // 0.10 = 2.5 onsets/sec, the published boundary between slow (0.2-2.5 Hz)
     // and fast (>2.5 Hz) musical event rates.

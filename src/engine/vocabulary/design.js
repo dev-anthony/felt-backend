@@ -83,6 +83,10 @@ const COLOR_SYSTEMS = [
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'color_infrared_false', category: 'color', tags: ['infrared', 'false-color', 'thermal'],
     fragment: 'false-color infrared rendering — heat-signature reds/whites against cold monochrome green or blue, nothing reading as natural skin tone',
+    // A no-people cover has no skin for this fragment's own reference point to
+    // mean anything — the thermal concept doesn't disappear, it just maps onto
+    // whatever IS in frame: friction heat, retained warmth, a cooling edge.
+    noPeopleFragment: 'false-color infrared rendering — heat-signature reds/whites bleeding from the object\'s warmest point out into cold monochrome green or blue at its coolest edges, its own residual heat and friction mapped in false color rather than skin',
     anchor: { darkness: 0.65, aggression: 0.45, valence: 0.2, brightness: 0.4 },
     techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]

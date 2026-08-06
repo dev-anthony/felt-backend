@@ -417,7 +417,10 @@ const SYMBOLISM = [
     archetypes: ['PRIMAL', 'TENDERNESS'], scope: 'universal',
     anchor: { acousticness: 0.65, warmth: 0.6, grit: 0.55, energy: 0.45 },
     staging: {
-      normal: 'wet earth or clay worked by hand, the marks of the working still in it',
+      // "worked by hand" reworded to describe the evidence of shaping rather
+      // than a hand mid-action — reads correctly whether or not a person is
+      // in frame, so no separate noPeopleFragment is needed here.
+      normal: 'wet earth or clay, its surface pressed and shaped, the marks of that working still in it',
       luxury: 'raw unglazed clay presented as sculpture against pale stone',
       gritty: 'cracked dried mud underfoot, dust lifting off the surface',
     } },
