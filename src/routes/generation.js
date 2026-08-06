@@ -207,13 +207,17 @@ RELEVANCE MANDATE (this is the entire job — read this before anything below it
 
 DEPICTING CONNECTION, CHEMISTRY & DESIRE — ONLY IF THE SONG IS LITERALLY ABOUT THIS:
 Apply this section ONLY when the song's actual subject is attraction, wanting someone, dancing with someone, or romantic/sexual chemistry. If the song is about something else — holding on to something slipping away, loss, resistance, ambition, grief, solitude, anger, defiance — IGNORE THIS SECTION ENTIRELY. A fast tempo or high energy reading is NOT the same thing as a song being about connection; do not reach for a club, a crowd, a dancefloor or generic "nightlife energy" imagery just because a track is fast or loud.
-When the song genuinely is about attraction/chemistry/desire, there is a failure mode to avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
+${subjectMode === 'absent' ? `This cover has NO human figure (see the construction rules below) — depict connection entirely through the object or material itself, never by adding a person or body part just to satisfy this section. The charge comes from proximity and implication between things, not from a body:
+- Near-contact, not contact: a magnet held a hair's width from metal, condensation bridging the gap between two glasses, two threads crossing but not yet knotted.
+- Evidence of a presence that just left or hasn't arrived yet: a second cup still warm, a chair pushed back mid-motion, light from two separate sources overlapping on one surface.
+- The object itself changed by something else's presence: wax fused from two candles burned side by side, a scorch mark where two things touched, fabric still holding the shape of a grip that let go.
+Any of these carries real charge without a figure. Choose tension over stillness whenever the register allows it.` : `When the song genuinely is about attraction/chemistry/desire, there is a failure mode to avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
 Instead, convey connection through ENERGY, MOTION and IMPLICATION:
 - The subject caught mid-dance — weight shifted, hips turned, hair and fabric still moving, feet off the beat.
 - An action that only makes sense because someone else is there: reaching toward the edge of frame, glancing back over a shoulder, laughing at something off-camera, pulling someone's hand that is just out of shot.
 - A charged environment that holds another presence: two shadows cast by one light, a second drink on the table, a crowd blurred close around them, a hand entering the frame's edge.
 - Heat in the room: sweat catching light, a packed floor, condensation, smoke, bodies implied at the frame's border.
-Any of these beats a static portrait. Choose energy over stillness whenever the register allows it.
+Any of these beats a static portrait. Choose energy over stillness whenever the register allows it.`}
 
 BANNED POSES — these have become defaults and are now forbidden unless the brief explicitly demands them:
 - a hand resting on one's own collarbone, neck or chest
@@ -230,12 +234,12 @@ ENVIRONMENT & MOMENT (a cover is a PLACE and a MOMENT, not a floating portrait):
 - Describe a MOMENT OF ACTION — what is HAPPENING. Caught mid-step, glancing back, laughing, adjusting a chain, leaning off a wall, stepping through smoke.
 - Match the AESTHETIC WORLD from the register block: Normal = grounded real places and natural materials; Luxury = premium materials, flawless surfaces, expensive light; Gritty = visible wear, real dirt and sweat, uncorrected light.
 - Match the INTENSITY tier: Low is restrained and quiet; Extra High consumes the frame.
-- BALANCE: give the location, the action and the atmosphere at least as much attention as the person.
-
+- BALANCE: give the location and the atmosphere at least as much attention as ${subjectMode === 'absent' ? 'the object or material itself' : 'the person'}.
+${subjectMode === 'absent' ? '' : `
 SUBJECT COUNT (safety):
 - Default to ONE subject in frame. A second person requires explicit justification from the brief (a duo, a named collaboration).
 - Never depict two people embracing, kissing, or in romantic or sexual physical contact, regardless of how romantic the lyrics are. Use the CONNECTION techniques above instead — motion, implication, a charged environment, a hand at the frame's edge. Those are not consolation prizes; they are the stronger image.
-
+`}
 STORY-ONLY RULE:
 - You write the STORY, never the ${M.execution}. Describe only: what is in frame, where it is, what is physically happening, and at most ONE symbolic object.
 - Do NOT mention ${M.forbid}. A separate system decides every one of those; naming them here corrupts the result.
@@ -299,6 +303,19 @@ function deriveSceneMode(features) {
     console.warn(`[SCENE MODE] falling back to photo/person: ${err?.message || err}`)
     return { mediumFamily: 'photo', subjectMode: 'person' }
   }
+}
+
+/**
+ * The winning visual metaphor's own `hasPerson` tag overrides the audio-only
+ * subject guess from `deriveSceneMode` — whether a figure belongs in the
+ * frame is now a property of the chosen image, not a separate coin flip from
+ * the feature vector. Falls back to the audio-derived guess only when the
+ * metaphor call produced nothing usable (`hasPerson` is null).
+ */
+function resolveSubjectMode(sceneMode, hasPerson) {
+  if (hasPerson === true) return { ...sceneMode, subjectMode: 'person' }
+  if (hasPerson === false) return { ...sceneMode, subjectMode: 'absent' }
+  return sceneMode
 }
 
 function parseSceneResponse(rawText, fallbackScene) {
@@ -414,12 +431,12 @@ async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '
 
 async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext, features }) {
   const technique = resolveTechnique(features, null, userInput)
-  const { metaphor } = await generateVisualMetaphors({
+  const { metaphor, hasPerson } = await generateVisualMetaphors({
     generate: geminiRawText,
     userFeeling: userInput,
     context: sonicFeatures,
   })
-  const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(features), technique, metaphor })}
+  const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(features), hasPerson), technique, metaphor })}
 
 INPUT MATRIX TO CONVERT:
 1. Artist's Core Feeling / What The Song Is About: "${userInput.trim()}"
@@ -518,13 +535,13 @@ router.post('/expand', requireAuth, async (req, res) => {
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
 const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
     const technique = resolveTechnique(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
-    const { metaphor } = await generateVisualMetaphors({
+    const { metaphor, hasPerson } = await generateVisualMetaphors({
       generate: geminiRawText,
       userFeeling: basic_input,
       context: emotionalRegister,
     })
 
-    const promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor })}
+    const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -693,12 +710,12 @@ router.post('/transcribe', requireAuth, async (req, res) => {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
       
       const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
-      const { metaphor } = await generateVisualMetaphors({
+      const { metaphor, hasPerson } = await generateVisualMetaphors({
         generate: geminiRawText,
         userFeeling: userVibeInput,
         context: emotionalRegister,
       })
-      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor })}
+      promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 ${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
 ${emotionalRegister}
@@ -712,12 +729,12 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
       const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId)
-      const { metaphor: metaphor2 } = await generateVisualMetaphors({
+      const { metaphor: metaphor2, hasPerson: hasPerson2 } = await generateVisualMetaphors({
         generate: geminiRawText,
         userFeeling: `${userVibeInput}. ${distilledTheme}`,
         context: emotionalRegister2,
       })
-      promptText = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor: metaphor2 })}
+      promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson2), technique, metaphor: metaphor2 })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
@@ -983,13 +1000,13 @@ router.patch('/refine', requireAuth, async (req, res) => {
       ? existingBrief.technique
       : resolveTechnique(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest)
 
-    const { metaphor: refineMetaphor } = await generateVisualMetaphors({
+    const { metaphor: refineMetaphor, hasPerson: refineHasPerson } = await generateVisualMetaphors({
       generate: geminiRawText,
       userFeeling: modRequest || existingBrief?.scene || '',
       context: trackSonicFeatures,
     })
 
-    const refinementPrompt = `${aestheticSystemPrompt({ ...deriveSceneMode(upload.audio_features), technique, metaphor: refineMetaphor })}
+    const refinementPrompt = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), refineHasPerson), technique, metaphor: refineMetaphor })}
 ${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
 You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — the technique above is LOCKED; write a new staging that suits it.
 

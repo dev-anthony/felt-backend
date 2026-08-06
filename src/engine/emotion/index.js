@@ -120,7 +120,14 @@ function scaleIntensity(v) {
  * recommends for genre. Keyword-based and deterministic, applied as a bounded
  * nudge so it corrects rather than overwrites.
  */
-const POSITIVE_CUES = /\b(upbeat|feel[- ]?good|joy|joyful|happy|celebrat\w*|party|fun|playful|bright|uplift\w*|triumph\w*|victory|sweet|love|romantic|vibe\w*|groove\w*)\b/i
+// Widened after a real track ("i just feel hope... everything is gonna be
+// alright" — an explicit, unambiguous statement of optimism) matched NOTHING
+// here. The correction never fired, the raw minor-key/valence-48 audio read
+// went through unopposed, and the cover came out melancholic despite the
+// artist's words being about as clear a positive statement as exists. "Hope"
+// and "alright" are ordinary ways to say this and belong in the base list,
+// not an edge case.
+const POSITIVE_CUES = /\b(upbeat|feel[- ]?good|joy|joyful|happy|celebrat\w*|party|fun|playful|bright|uplift\w*|triumph\w*|victory|sweet|love|romantic|vibe\w*|groove\w*|hope\w*|alright|okay|faith|believ\w*|optimis\w*|grateful|bless\w*|heal\w*|resilien\w*|overcome\w*|stronger)\b/i
 // "energy"/"energetic" were removed from this list: they're the single most
 // generic intensity word in the language ("strong energy", "dark energy",
 // "anxious energy") and matched on almost any emotionally intense description
