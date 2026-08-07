@@ -354,49 +354,66 @@ function buildFluxPrompt(technique, scene) {
 function simplifyForImageModel(aestheticPrompt, technique) {
   console.log('[SIMPLIFY] input prompt length:', aestheticPrompt.length, 'chars')
 
-  // The core scene is usually 2-4 contiguous sentences of narrative prose (the actual
-  // what/where/action). It comes AFTER all the capitalized instruction blocks
-  // (RELEVANCE MANDATE, LOCKED TECHNIQUE, etc). Strategy: look for the longest
-  // unbroken prose block — that's the scene.
-  const paragraphs = aestheticPrompt.split(/\n\n+/)
+  // Extract the NARRATIVE SCENE — the actual story/action, NOT the style directives.
+  // The scene is the prose that DESCRIBES THE IMAGE (subject, action, location).
+  // Style vocabulary like "bold screen-print", "collage feel", "thermal rendering"
+  // comes AFTER the scene and should not be extracted as the scene itself.
+
+  // Strategy: Find sentences that contain ACTION VERBS and concrete nouns
+  // (people, objects, places, verbs like "caught", "straining", "reaching", etc).
+  // Skip blocks that are purely style adjectives.
+
+  const sentences = aestheticPrompt.split(/(?<=[.!?])\s+/)
   let coreScene = ''
-  let longestLength = 0
-  for (const para of paragraphs) {
-    // Skip all-caps sections (instructions) and short fragments
-    if (para.toUpperCase() === para || para.length < 40 || para.includes('Do NOT') || para.includes('ONLY')) {
-      continue
-    }
-    // The scene is prose that starts with a person/object/place and describes action
-    if (para.length > longestLength) {
-      longestLength = para.length
-      coreScene = para.trim()
+
+  for (const sent of sentences) {
+    const lower = sent.toLowerCase()
+    const trimmed = sent.trim()
+
+    // Skip instruction blocks, all-caps rules, and style-only directives
+    if (trimmed.toUpperCase() === trimmed) continue
+    if (trimmed.startsWith('Do NOT') || trimmed.startsWith('ONLY') || trimmed.startsWith('This')) continue
+    if (trimmed.startsWith('-') || trimmed.startsWith('*')) continue
+
+    // Keep sentences that have concrete narrative elements:
+    // - Start with a subject (a, an, the, or proper noun)
+    // - Contain action verbs or spatial descriptions
+    // - Describe WHAT/WHERE/ACTION, not just style
+    const isNarrative = /^(a |an |the |A |An |The |[A-Z]\w+\s)/.test(trimmed) &&
+                        /\b(caught|gripping|splayed|straining|stretched|pressed|leaning|standing|running|moving|halting|ending|terminating|streaking|pulling|pushing|reaching|glancing|emerging|disappearing|fading)\b/i.test(lower) ||
+                        /\b(street|bus|window|room|landscape|field|water|sky|light|darkness|intersection|platform|edge|surface)\b/i.test(lower)
+
+    if (isNarrative && trimmed.length > 20) {
+      coreScene += (coreScene ? ' ' : '') + trimmed
+      // Stop after 2-3 substantive narrative sentences
+      if (coreScene.split(/[.!?]/).length >= 3) break
     }
   }
 
-  // Fallback: if we didn't find a clear prose block, extract the first substantive
-  // sentences that aren't rules/instructions.
-  if (!coreScene || coreScene.length < 50) {
-    const lines = aestheticPrompt.split('\n').filter(l => {
-      const t = l.trim()
-      return t.length > 20 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) && !t.startsWith('-') && !t.startsWith('*')
+  // Fallback: if narrative extraction fails, grab the first 2-3 non-instruction sentences
+  if (!coreScene || coreScene.length < 40) {
+    const nonStyle = aestheticPrompt.split(/[.!?]/).filter(s => {
+      const t = s.trim()
+      return t.length > 30 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) &&
+             !t.includes('Do NOT') && !t.includes('rendering') && !t.includes('palette')
     })
-    coreScene = lines.slice(0, 5).join(' ').trim()
+    coreScene = nonStyle.slice(0, 2).join('. ').trim() + '.'
   }
 
   // Extract technique vocabulary
   const techniqueLang = TECHNIQUE_SUFFIXES[technique] || ''
 
-  // Rebuild SHORT and SUBJECT-FIRST
+  // Rebuild SUBJECT-FIRST: scene narrative, THEN technique, THEN format
   const simplified = [
-    coreScene.substring(0, 400),  // Cap it so we don't lose technique language
+    coreScene.substring(0, 300),  // Core scene first
     techniqueLang,
     '1:1 square cover, intentional and authentic.'
   ].filter(Boolean).join(' ')
 
-  console.log('[SIMPLIFY] extracted scene (first 100 chars):', coreScene.substring(0, 100))
-  console.log('[SIMPLIFY] technique:', technique, '→', techniqueLang.substring(0, 80))
+  console.log('[SIMPLIFY] extracted scene (first 120 chars):', coreScene.substring(0, 120))
+  console.log('[SIMPLIFY] technique:', technique)
   console.log('[SIMPLIFY] final simplified prompt length:', simplified.length, 'chars')
-  console.log('[SIMPLIFY] sending to image model (first 150 chars):', simplified.substring(0, 150))
+  console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:\n', simplified)
 
   return simplified
 }
