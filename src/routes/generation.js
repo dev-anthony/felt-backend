@@ -185,28 +185,29 @@ function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person',
 
 Everything you write must serve one goal: someone who has heard this song should look at the cover and recognise it. Not "a nice image" — THIS song's image.
 
-An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it first and let it govern the frame — the register, the aesthetic world, the intensity tier, the MOVEMENT line, and above all the VISUAL DIRECTION line.
-- VISUAL DIRECTION names the lighting, palette, composition and texture this combination calls for. Treat it as the brief.
-- If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it there.
-${metaphor ? `
-VISUAL METAPHOR (MANDATORY — this is the image, not a suggestion):
-${metaphor}
-Build the entire scene around this image. It is the subject of the cover, not decoration inside it — do not replace it with a literal illustration of the artist's words or a generic scene for this genre. If a person appears, they are staged interacting with this image, not standing next to a version of it that could be swapped out. If the metaphor describes an object or material with no person in it, that is correct — do not add a figure just to have one.
-` : ''}
-
-LOCKED TECHNIQUE (already chosen mathematically from this track's emotion — do NOT choose a different one, do NOT mention its name or output a TECHNIQUE line):
-- ${techniqueName} — ${t.purpose}
-- Visual signature: ${t.visualSignature}
-- Best for: ${t.bestFor.join('; ')}
-- Common mistake to avoid: ${t.commonMistakes}
-- Write the scene so this technique feels inevitable — the location, action and staging should be what a photographer would naturally reach for to shoot it this way.
-
-RELEVANCE MANDATE (this is the entire job — read this before anything below it):
+RELEVANCE MANDATE (READ THIS FIRST — this is the entire job):
 - The artist's own words below are the PRIMARY source for the subject, place and action. Work out what physical situation actually embodies what they said — not the closest genre stereotype, not the most common interpretation, THIS specific thing.
 - Any example locations, props or imagery named further down in this brief are illustrations of a STYLE, never a menu. Do not default to one just because it is concrete and easy to reach for. If nothing on those lists fits what the artist actually described, ignore all of them and invent something that does.
 - A high tempo or high energy reading describes HOW FAST the song is, not WHAT IT IS ABOUT. Never let tempo/energy alone justify a location or an activity (a club, a party, dancing) that the artist's own words don't support.
 - Never fall back on a generic default (a lone figure in a dim room, someone staring out a rain-streaked window) unless the theme is literally that.
 - Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object — derived from the artist's words, not assembled from this brief's example lists.
+
+An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it to understand the register, the aesthetic world, the intensity tier, the MOVEMENT line, and the VISUAL DIRECTION — this informs HOW you execute the scene, not WHAT the scene is.
+- VISUAL DIRECTION names the lighting, palette, composition and texture this combination calls for. Use it as a rendering guide.
+- If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it — but only if it doesn't contradict the artist's actual words.
+
+${metaphor ? `
+VISUAL METAPHOR (MANDATORY — this is the image, not a suggestion):
+${metaphor}
+This is the physical image that embodies the artist's emotional truth. Build the entire scene around this image. It is the subject of the cover, not decoration inside it — do not replace it with a literal illustration of the artist's words or a generic scene for this genre. If a person appears, they are staged interacting with this image, not standing next to a version of it that could be swapped out. If the metaphor describes an object or material with no person in it, that is correct — do not add a figure just to have one.
+` : ''}
+
+LOCKED TECHNIQUE (RENDERING VOCABULARY ONLY — do NOT let this change what the scene IS):
+- ${techniqueName} — ${t.purpose}
+- Visual signature: ${t.visualSignature}
+- Best for: ${t.bestFor.join('; ')}
+- Common mistake to avoid: ${t.commonMistakes}
+- This technique describes HOW to render the scene artistically, not WHAT scene to write. Use its vocabulary for sensory detail (lighting model, texture, color palette, mood intensity) but do NOT let it override the concrete scene the artist's words demand. Example: "infrared thermal" gives you heat-signature vocabulary (orange, blue, thermal blooms), but it cannot change "a person holding onto a departing bus" into "an abstract heat signature". The person holding the bus is the scene. The thermal imagery is how you describe that scene.
 
 DEPICTING CONNECTION, CHEMISTRY & DESIRE — ONLY IF THE SONG IS LITERALLY ABOUT THIS:
 Apply this section ONLY when the song's actual subject is attraction, wanting someone, dancing with someone, or romantic/sexual chemistry. If the song is about something else — holding on to something slipping away, loss, resistance, ambition, grief, solitude, anger, defiance — IGNORE THIS SECTION ENTIRELY. A fast tempo or high energy reading is NOT the same thing as a song being about connection; do not reach for a club, a crowd, a dancefloor or generic "nightlife energy" imagery just because a track is fast or loud.
@@ -333,6 +334,51 @@ function parseSceneResponse(rawText, fallbackScene) {
 function buildFluxPrompt(technique, scene) {
   const suffix = TECHNIQUE_SUFFIXES[technique] || TECHNIQUE_SUFFIXES[DEFAULT_TECHNIQUE]
   return `${scene}. ${suffix} Definitively moody, intentional, and authentic — zero digital smoothing, zero CGI artifacts, zero plastic AI skin.`
+}
+
+/**
+ * IMAGE MODEL SIMPLIFICATION LAYER.
+ *
+ * The `aestheticSystemPrompt()` output is 200+ words of technical language,
+ * reasoning, and constraints designed for Gemini to read and plan around. But
+ * image models (Flux, Sana, etc.) actually perform better on SHORT, SUBJECT-
+ * FIRST prose that names what the cover IS before anything else.
+ *
+ * This function extracts the core scene and technique from the verbose prompt
+ * and rebuilds it as something an image model can actually execute:
+ * - Subject + action + location first (1-2 sentences)
+ * - Technique as secondary rendering language
+ * - Specific visual details, not abstract adjectives
+ *
+ * @param {string} aestheticPrompt the full verbose prompt from buildFinalPrompt()
+ * @param {string} technique the TECHNIQUE_SUFFIXES key
+ * @returns {string} short, image-model-friendly prompt
+ */
+function simplifyForImageModel(aestheticPrompt, technique) {
+  // Extract the core scene — it's usually after "Artist input text:" or in the
+  // middle of the prompt between the instructions. For now, take everything
+  // between "Artist input text:" and the next major section heading if it exists,
+  // or just grab the longest contiguous prose block (the scene description).
+  const artistInputMatch = aestheticPrompt.match(/Artist input text:\s*(.+?)(?:Audio context|$)/is)
+  let coreScene = artistInputMatch ? artistInputMatch[1].trim() : ''
+
+  if (!coreScene || coreScene.length < 20) {
+    // Fallback: extract the first 2-3 sentences from after "Artist input text"
+    // or any large block of continuous prose (not just rules/bullets).
+    const sentences = aestheticPrompt.split(/\.\s+/).slice(0, 4).join('. ')
+    coreScene = sentences.substring(0, 300)
+  }
+
+  // Extract technique vocabulary — the TECHNIQUE_SUFFIXES value gives us
+  // specific rendering language (thermal, infrared, 8mm, etc.).
+  const techniqueLang = TECHNIQUE_SUFFIXES[technique] || ''
+
+  // Rebuild as SHORT and SUBJECT-FIRST.
+  return [
+    coreScene.trim(),
+    techniqueLang,
+    'Shot as a single 1:1 square cover, intentional and authentic, zero plastic AI artifacts.'
+  ].filter(Boolean).join(' ')
 }
 
 async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false, mediumFamily } = {}) {
@@ -891,9 +937,13 @@ router.post('/', requireAuth, async (req, res) => {
 
     console.log(`[IMAGE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline for ID: ${generationId} technique=${technique}`)
 
+    // Simplify the verbose aesthetic prompt into something image models can
+    // actually execute — short, subject-first, no 200 lines of reasoning.
+    const simplifiedPromptForModel = simplifyForImageModel(absoluteFluxPrompt, technique)
+
     let imagePayloadUrl
     try {
-      imagePayloadUrl = await generateImage(absoluteFluxPrompt, {
+      imagePayloadUrl = await generateImage(simplifiedPromptForModel, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
         referenceImageB64: reference_image_b64 || undefined,
@@ -1064,9 +1114,12 @@ INPUT REFINEMENT VARIABLES:
 
     console.log(`[HF-FLUX-REFINEMENT] Launching pipeline serverless inference generation layer. ID: ${generationId} technique=${technique}`);
 
+    // Simplify the verbose aesthetic prompt (same as in POST / above).
+    const simplifiedRefinedPrompt = simplifyForImageModel(absoluteFluxRefinedPrompt, technique)
+
     let imagePayloadUrl;
     try {
-      imagePayloadUrl = await generateImage(absoluteFluxRefinedPrompt, {
+      imagePayloadUrl = await generateImage(simplifiedRefinedPrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
         referenceImageB64: reference_image_b64 || undefined,
