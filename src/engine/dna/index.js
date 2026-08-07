@@ -239,6 +239,11 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
     chosen.layer = layer.key
     chosen.priority = layer.priority
 
+    // Log the selection so we can audit what's actually being chosen
+    if (layer.key === 'graphic' || layer.key === 'lighting' || layer.key === 'color') {
+      console.log(`[DNA-SELECT] ${layer.key}: ${chosen.conceptId} → "${chosen.fragment.substring(0, 70)}..."`)
+    }
+
     // STATE-AWARE STAGING.
     // A symbol carries one meaning but is a different physical object in a
     // different world — the open road is a coastal highway from a supercar in

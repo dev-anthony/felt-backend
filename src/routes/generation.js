@@ -339,46 +339,66 @@ function buildFluxPrompt(technique, scene) {
 /**
  * IMAGE MODEL SIMPLIFICATION LAYER.
  *
- * The `aestheticSystemPrompt()` output is 200+ words of technical language,
- * reasoning, and constraints designed for Gemini to read and plan around. But
- * image models (Flux, Sana, etc.) actually perform better on SHORT, SUBJECT-
- * FIRST prose that names what the cover IS before anything else.
+ * The `aestheticSystemPrompt()` output is 200+ words for Gemini to reason through.
+ * Image models (Flux, Sana, Pollinations) work MUCH better on SHORT, CLEAR prompts
+ * that name the actual scene first, then technique/style as secondary.
  *
- * This function extracts the core scene and technique from the verbose prompt
- * and rebuilds it as something an image model can actually execute:
- * - Subject + action + location first (1-2 sentences)
- * - Technique as secondary rendering language
- * - Specific visual details, not abstract adjectives
+ * This extracts the core narrative prose from the verbose prompt and rebuilds it
+ * as something image models can actually execute. Logs exactly what was extracted
+ * and what's being sent.
  *
  * @param {string} aestheticPrompt the full verbose prompt from buildFinalPrompt()
  * @param {string} technique the TECHNIQUE_SUFFIXES key
  * @returns {string} short, image-model-friendly prompt
  */
 function simplifyForImageModel(aestheticPrompt, technique) {
-  // Extract the core scene — it's usually after "Artist input text:" or in the
-  // middle of the prompt between the instructions. For now, take everything
-  // between "Artist input text:" and the next major section heading if it exists,
-  // or just grab the longest contiguous prose block (the scene description).
-  const artistInputMatch = aestheticPrompt.match(/Artist input text:\s*(.+?)(?:Audio context|$)/is)
-  let coreScene = artistInputMatch ? artistInputMatch[1].trim() : ''
+  console.log('[SIMPLIFY] input prompt length:', aestheticPrompt.length, 'chars')
 
-  if (!coreScene || coreScene.length < 20) {
-    // Fallback: extract the first 2-3 sentences from after "Artist input text"
-    // or any large block of continuous prose (not just rules/bullets).
-    const sentences = aestheticPrompt.split(/\.\s+/).slice(0, 4).join('. ')
-    coreScene = sentences.substring(0, 300)
+  // The core scene is usually 2-4 contiguous sentences of narrative prose (the actual
+  // what/where/action). It comes AFTER all the capitalized instruction blocks
+  // (RELEVANCE MANDATE, LOCKED TECHNIQUE, etc). Strategy: look for the longest
+  // unbroken prose block — that's the scene.
+  const paragraphs = aestheticPrompt.split(/\n\n+/)
+  let coreScene = ''
+  let longestLength = 0
+  for (const para of paragraphs) {
+    // Skip all-caps sections (instructions) and short fragments
+    if (para.toUpperCase() === para || para.length < 40 || para.includes('Do NOT') || para.includes('ONLY')) {
+      continue
+    }
+    // The scene is prose that starts with a person/object/place and describes action
+    if (para.length > longestLength) {
+      longestLength = para.length
+      coreScene = para.trim()
+    }
   }
 
-  // Extract technique vocabulary — the TECHNIQUE_SUFFIXES value gives us
-  // specific rendering language (thermal, infrared, 8mm, etc.).
+  // Fallback: if we didn't find a clear prose block, extract the first substantive
+  // sentences that aren't rules/instructions.
+  if (!coreScene || coreScene.length < 50) {
+    const lines = aestheticPrompt.split('\n').filter(l => {
+      const t = l.trim()
+      return t.length > 20 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) && !t.startsWith('-') && !t.startsWith('*')
+    })
+    coreScene = lines.slice(0, 5).join(' ').trim()
+  }
+
+  // Extract technique vocabulary
   const techniqueLang = TECHNIQUE_SUFFIXES[technique] || ''
 
-  // Rebuild as SHORT and SUBJECT-FIRST.
-  return [
-    coreScene.trim(),
+  // Rebuild SHORT and SUBJECT-FIRST
+  const simplified = [
+    coreScene.substring(0, 400),  // Cap it so we don't lose technique language
     techniqueLang,
-    'Shot as a single 1:1 square cover, intentional and authentic, zero plastic AI artifacts.'
+    '1:1 square cover, intentional and authentic.'
   ].filter(Boolean).join(' ')
+
+  console.log('[SIMPLIFY] extracted scene (first 100 chars):', coreScene.substring(0, 100))
+  console.log('[SIMPLIFY] technique:', technique, '→', techniqueLang.substring(0, 80))
+  console.log('[SIMPLIFY] final simplified prompt length:', simplified.length, 'chars')
+  console.log('[SIMPLIFY] sending to image model (first 150 chars):', simplified.substring(0, 150))
+
+  return simplified
 }
 
 async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false, mediumFamily } = {}) {
@@ -940,9 +960,12 @@ router.post('/', requireAuth, async (req, res) => {
     // Simplify the verbose aesthetic prompt into something image models can
     // actually execute — short, subject-first, no 200 lines of reasoning.
     const simplifiedPromptForModel = simplifyForImageModel(absoluteFluxPrompt, technique)
+    console.log(`[IMAGE-ENGINE] simplified prompt ready (${simplifiedPromptForModel.length} chars)`)
+    console.log(`[IMAGE-ENGINE] sample: "${simplifiedPromptForModel.substring(0, 150)}..."`)
 
     let imagePayloadUrl
     try {
+      console.log(`[IMAGE-ENGINE] sending to ${DEFAULT_PROVIDER}...`)
       imagePayloadUrl = await generateImage(simplifiedPromptForModel, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
@@ -1112,13 +1135,16 @@ INPUT REFINEMENT VARIABLES:
     const generationId = crypto.randomUUID();
     await supabase.from('uploads').update({ status: 'generating' }).eq('id', upload_id);
 
-    console.log(`[HF-FLUX-REFINEMENT] Launching pipeline serverless inference generation layer. ID: ${generationId} technique=${technique}`);
+    console.log(`[REFINE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline. ID: ${generationId} technique=${technique}`);
 
     // Simplify the verbose aesthetic prompt (same as in POST / above).
     const simplifiedRefinedPrompt = simplifyForImageModel(absoluteFluxRefinedPrompt, technique)
+    console.log(`[REFINE-ENGINE] simplified prompt ready (${simplifiedRefinedPrompt.length} chars)`)
+    console.log(`[REFINE-ENGINE] sample: "${simplifiedRefinedPrompt.substring(0, 150)}..."`)
 
     let imagePayloadUrl;
     try {
+      console.log(`[REFINE-ENGINE] sending to ${DEFAULT_PROVIDER}...`)
       imagePayloadUrl = await generateImage(simplifiedRefinedPrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,

@@ -42,8 +42,14 @@ Rules:
 - Order best-first — the metaphor a sharp art director would pick as the single most striking, specific image for THIS emotional truth, not the safest one. A more original object-only image should beat a generic person-based one.
 - For each metaphor, honestly tag whether it involves a person or any body part (hand, eyes, silhouette) at all.
 
+Diversity Requirement (CRITICAL):
+- Your 4 metaphors must come from 4 DIFFERENT domains/types. Do NOT output 3 variations of the same idea.
+- Types include: objects, weather, landscape, nature/materials, animals, architecture, light/weather, abstract phenomena, decay/growth, bodies/hands, water, fire/heat, plant/organic, geometric/structures, etc.
+- Example WRONG output: hand holding rope, hand grasping something, figure gripping — all the same idea repeated. DO NOT DO THIS.
+- Example RIGHT output: [abstract: eroding stone], [nature: wind carrying leaves], [object: fraying rope], [landscape: sunset disappearing] — each from a different domain, all expressing the same emotional truth.
+
 Respond with ONLY valid JSON, nothing else, no markdown fences, no commentary:
-{"metaphors": [{"image": "...", "hasPerson": true}, {"image": "...", "hasPerson": false}, {"image": "...", "hasPerson": true}, {"image": "...", "hasPerson": false}]}`
+{"metaphors": [{"image": "...", "hasPerson": false}, {"image": "...", "hasPerson": false}, {"image": "...", "hasPerson": false}, {"image": "...", "hasPerson": true}]}`
 }
 
 function parseMetaphors(rawText) {
@@ -69,18 +75,33 @@ function parseMetaphors(rawText) {
  */
 async function generateVisualMetaphors({ generate, userFeeling, context }) {
   const feeling = (userFeeling || '').trim()
-  if (!feeling) return { metaphor: null, hasPerson: null, candidates: [] }
+  if (!feeling) {
+    console.log('[METAPHOR] empty userFeeling, returning null')
+    return { metaphor: null, hasPerson: null, candidates: [] }
+  }
   try {
+    console.log(`[METAPHOR] generating from: "${feeling.substring(0, 80)}..."`)
     const rawText = await generate(buildMetaphorPrompt({ userFeeling: feeling, context }))
     const candidates = parseMetaphors(rawText)
     const winner = candidates[0] || null
+
+    console.log(`[METAPHOR] candidates generated: ${candidates.length}`)
+    candidates.forEach((c, i) => {
+      console.log(`  [${i}] ${c.hasPerson ? '[PERSON]' : '[NO-PERSON]'} ${c.image.substring(0, 60)}...`)
+    })
+    if (winner) {
+      console.log(`[METAPHOR] SELECTED (rank 0): ${winner.hasPerson ? '[PERSON]' : '[NO-PERSON]'} "${winner.image.substring(0, 100)}..."`)
+    } else {
+      console.log('[METAPHOR] no valid candidates parsed')
+    }
+
     return {
       metaphor: winner ? winner.image : null,
       hasPerson: winner ? winner.hasPerson : null,
       candidates,
     }
   } catch (err) {
-    console.warn(`[VISUAL METAPHOR] generation failed, continuing without one: ${err?.message || err}`)
+    console.warn(`[METAPHOR] generation failed: ${err?.message || err}`)
     return { metaphor: null, hasPerson: null, candidates: [] }
   }
 }
