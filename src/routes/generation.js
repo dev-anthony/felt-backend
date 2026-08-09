@@ -351,69 +351,87 @@ function buildFluxPrompt(technique, scene) {
  * @param {string} technique the TECHNIQUE_SUFFIXES key
  * @returns {string} short, image-model-friendly prompt
  */
+/**
+ * SIMPLIFIED PROMPT FOR IMAGE MODELS.
+ *
+ * Core principle: SEMANTIC NUCLEI MUST NEVER BE TRUNCATED.
+ *
+ * The aesthetic system prompt (200+ words, structured for Gemini reasoning) is
+ * NOT what image models should receive. They need:
+ * - SCENE NARRATIVE FIRST (complete, never mid-sentence)
+ * - TECHNIQUE LANGUAGE SECOND (how to render it)
+ * - FORMAT/METADATA LAST
+ *
+ * This structure works across ANY image model (Cloudflare, FLUX, Claude Vision, etc.)
+ * because it prioritizes coherent story over style vocabulary.
+ *
+ * CRITICAL: Never truncate "vibrates with extreme tension" to "vibrates with ext".
+ * If the scene is too long, cut at sentence boundaries, never mid-word.
+ */
 function simplifyForImageModel(aestheticPrompt, technique) {
   console.log('[SIMPLIFY] input prompt length:', aestheticPrompt.length, 'chars')
 
-  // Extract the NARRATIVE SCENE — the actual story/action, NOT the style directives.
-  // The scene is the prose that DESCRIBES THE IMAGE (subject, action, location).
-  // Style vocabulary like "bold screen-print", "collage feel", "thermal rendering"
-  // comes AFTER the scene and should not be extracted as the scene itself.
+  // Split into complete sentences to find the CORE NARRATIVE
+  // (subject + action + location/environment — the actual story)
+  const allSentences = aestheticPrompt.split(/(?<=[.!?])\s+/)
+  let narrativeSentences = []
 
-  // Strategy: Find sentences that contain ACTION VERBS and concrete nouns
-  // (people, objects, places, verbs like "caught", "straining", "reaching", etc).
-  // Skip blocks that are purely style adjectives.
-
-  const sentences = aestheticPrompt.split(/(?<=[.!?])\s+/)
-  let coreScene = ''
-
-  for (const sent of sentences) {
-    const lower = sent.toLowerCase()
+  for (const sent of allSentences) {
     const trimmed = sent.trim()
+    const lower = trimmed.toLowerCase()
 
-    // Skip instruction blocks, all-caps rules, and style-only directives
+    // Skip instructions, all-caps rules, style metadata
     if (trimmed.toUpperCase() === trimmed) continue
     if (trimmed.startsWith('Do NOT') || trimmed.startsWith('ONLY') || trimmed.startsWith('This')) continue
     if (trimmed.startsWith('-') || trimmed.startsWith('*')) continue
+    if (trimmed.includes('RELEVANCE MANDATE') || trimmed.includes('TECHNIQUE')) continue
 
-    // Keep sentences that have concrete narrative elements:
-    // - Start with a subject (a, an, the, or proper noun)
-    // - Contain action verbs or spatial descriptions
-    // - Describe WHAT/WHERE/ACTION, not just style
-    const isNarrative = /^(a |an |the |A |An |The |[A-Z]\w+\s)/.test(trimmed) &&
-                        /\b(caught|gripping|splayed|straining|stretched|pressed|leaning|standing|running|moving|halting|ending|terminating|streaking|pulling|pushing|reaching|glancing|emerging|disappearing|fading)\b/i.test(lower) ||
-                        /\b(street|bus|window|room|landscape|field|water|sky|light|darkness|intersection|platform|edge|surface)\b/i.test(lower)
+    // Keep sentences with CONCRETE ACTION or PLACE (the story)
+    const hasAction = /\b(caught|gripping|splayed|straining|stretched|pressed|leaning|standing|running|moving|halting|ending|terminating|streaking|pulling|pushing|reaching|glancing|emerging|disappearing|fading|vibrates|trembles|flows|churns)\b/i.test(lower)
+    const hasPlace = /\b(street|bus|window|room|landscape|field|water|sky|light|darkness|intersection|platform|edge|surface|canal|dock|intersection|frame)\b/i.test(lower)
+    const isSubject = /^(a |an |the |A |An |The |[A-Z]\w+\s)/.test(trimmed)
 
-    if (isNarrative && trimmed.length > 20) {
-      coreScene += (coreScene ? ' ' : '') + trimmed
-      // Stop after 2-3 substantive narrative sentences
-      if (coreScene.split(/[.!?]/).length >= 3) break
+    if ((hasAction || hasPlace) && isSubject && trimmed.length > 20) {
+      narrativeSentences.push(trimmed)
+      // Collect until we have the full story (usually 1-3 sentences)
+      if (narrativeSentences.length >= 3) break
     }
   }
 
-  // Fallback: if narrative extraction fails, grab the first 2-3 non-instruction sentences
-  if (!coreScene || coreScene.length < 40) {
-    const nonStyle = aestheticPrompt.split(/[.!?]/).filter(s => {
-      const t = s.trim()
-      return t.length > 30 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) &&
-             !t.includes('Do NOT') && !t.includes('rendering') && !t.includes('palette')
-    })
-    coreScene = nonStyle.slice(0, 2).join('. ').trim() + '.'
+  // Build COMPLETE scene narrative from full sentences
+  // NEVER truncate mid-word or mid-concept
+  let coreScene = narrativeSentences.join(' ')
+
+  // Fallback: if no narrative sentences found, extract first non-style block
+  if (!coreScene || coreScene.length < 50) {
+    const blocks = aestheticPrompt.split(/\n\n+/)
+    for (const block of blocks) {
+      const t = block.trim()
+      if (t.length > 40 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) &&
+          !t.includes('Do NOT') && !t.includes('MANDATE')) {
+        coreScene = t
+        break
+      }
+    }
   }
 
-  // Extract technique vocabulary
+  // Extract technique vocabulary (this is the ONLY place technique language goes)
   const techniqueLang = TECHNIQUE_SUFFIXES[technique] || ''
 
-  // Rebuild SUBJECT-FIRST: scene narrative, THEN technique, THEN format
+  // REBUILD: SCENE-FIRST STRUCTURE FOR ALL IMAGE MODELS
+  // This order works across Cloudflare, FLUX, Claude Vision, future models
   const simplified = [
-    coreScene.substring(0, 300),  // Core scene first
-    techniqueLang,
+    coreScene.trim(),  // COMPLETE scene, never truncated
+    techniqueLang,     // Technique language
     '1:1 square cover, intentional and authentic.'
-  ].filter(Boolean).join(' ')
+  ].filter((s) => s && s.length > 0).join(' ')
 
-  console.log('[SIMPLIFY] extracted scene (first 120 chars):', coreScene.substring(0, 120))
-  console.log('[SIMPLIFY] technique:', technique)
+  console.log('[SIMPLIFY] narrative sentences:', narrativeSentences.length)
+  console.log('[SIMPLIFY] core scene length:', coreScene.length, 'chars (COMPLETE, no truncation)')
   console.log('[SIMPLIFY] final simplified prompt length:', simplified.length, 'chars')
-  console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:\n', simplified)
+  console.log('[SIMPLIFY] STRUCTURE: [SCENE] → [TECHNIQUE] → [FORMAT]')
+  console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:')
+  console.log(simplified)
 
   return simplified
 }
@@ -1232,3 +1250,4 @@ module.exports = router;
 // worth asserting directly rather than only observing through a live Gemini call.
 module.exports.aestheticSystemPrompt = aestheticSystemPrompt
 module.exports.deriveSceneMode = deriveSceneMode
+module.exports.simplifyForImageModel = simplifyForImageModel

@@ -33,6 +33,8 @@ const TECHNIQUES = {
     suffix: 'An unstaged frame — the kind a friend takes at 2am, nothing arranged for the camera.',
     dnaBias: { grit: +0.12, energy: +0.08 },
     graphic: ['graphic_clean_photo', 'graphic_parental_advisory'],
+    // These mediums contradict the documentary aesthetic — documentary IS the technique
+    graphicForbidden: ['graphic_collage', 'graphic_minimal_luxury', 'graphic_riso_print'],
     purpose: 'Capture a moment as if the camera happened to be there — nothing composed, nothing waiting for its mark.',
     // 0-10 per axis. This is the technique's OWN visual language, independent
     // of any emotion — it's what lets the affinity matrix below stay honest
@@ -200,6 +202,8 @@ MONUMENTAL_SCALE_ISOLATION: {
     suffix: 'A real infrared or thermal-sensor capture, not a color-graded imitation of one.',
     dnaBias: { darkness: +0.10, aggression: +0.05 },
     graphic: ['graphic_clean_photo'],
+    // Thermal imaging is a PHOTOGRAPHIC technique — illustration mediums directly contradict it
+    graphicForbidden: ['graphic_collage', 'graphic_riso_print', 'graphic_vinyl_sleeve', 'graphic_panel_grid'],
     purpose: 'See via a non-visible spectrum — heat or infrared — so the image reads as surveilled, othered, or inhuman rather than simply dark.',
     axes: { movement: 2, energy: 4, intimacy: 1, grandeur: 3, luxury: 1, isolation: 6, chaos: 4, stillness: 6 },
     bestFor: ['paranoia, surveillance, being watched', 'dehumanization, threat, the uncanny', 'cold, clinical dread'],

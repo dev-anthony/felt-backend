@@ -1,4 +1,5 @@
 'use strict'
+const { mulberry32 } = require('../dna/scoring')
 /**
  * PHOTOGRAPHIC REALITY ENGINE — FELT's believability layer.
  *

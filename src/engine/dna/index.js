@@ -18,6 +18,7 @@ const { buildFeatureVector, dspDims } = require('./featureVector')
 const { selectConcept } = require('./scoring')
 const { getCategory, getConcept } = require('../vocabulary')
 const { conceptMediumFamily } = require('../assembler/promptAssembler')
+const { TECHNIQUES } = require('../technique')
 const { applyTechniqueBias, getAffinity, DEFAULT_TECHNIQUE, isValidTechnique } = require('../technique')
 // Safe require order: emotion/index pulls in dna/scoring only, never dna/index,
 // so this is a tree rather than a cycle.
@@ -181,6 +182,24 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
         return true
       })
       if (compatible.length) candidates = compatible
+    }
+
+    // TECHNIQUE AUTHORITY.
+    // The selected technique may declare certain graphic mediums as fundamentally
+    // incompatible with its visual language. For example, INFRARED_THERMAL is a
+    // photographic technique — illustration mediums like collage or screen-print
+    // directly contradict it. Check the technique's graphicForbidden list and
+    // exclude those concepts entirely, preventing the DNA from undermining the
+    // already-chosen technique.
+    if (layer.key === 'graphic' && technique) {
+      const t = TECHNIQUES[technique]
+      if (t && t.graphicForbidden && t.graphicForbidden.length > 0) {
+        const compatible = candidates.filter((c) => !t.graphicForbidden.includes(c.id))
+        if (compatible.length > 0) {
+          console.log(`[DNA-TECHNIQUE] ${technique} forbids [${t.graphicForbidden.join(', ')}], filtered to ${compatible.length} candidates`)
+          candidates = compatible
+        }
+      }
     }
 
     // TONAL AGREEMENT.
