@@ -79,6 +79,38 @@ function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmo
   }
 }
 
+/**
+ * Structured kinetic facts for the metaphor generator.
+ *
+ * `buildEmotionalRegister` already runs `readEmotion` and renders a prose block,
+ * but that block's MOVEMENT line is written for the scene writer in body terms
+ * ("the body must read as physically in motion"), which is the wrong instruction
+ * for an object/material metaphor. Rather than have the metaphor generator parse
+ * prose meant for someone else, this hands it the numbers directly.
+ *
+ * Uses `correctedVector`, so the artist's own words (e.g. "hope") have already
+ * moved these values before the metaphor sees them. Deterministic and cheap —
+ * readEmotion is pure arithmetic, no API call — so recomputing here rather than
+ * threading a second return value through five call sites is the safer trade.
+ */
+function buildKinetics(features, declaredGenre, intentText, declaredEmotionId) {
+  try {
+    const vector = buildFeatureVector(features)
+    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
+    const v = read.correctedVector
+    return {
+      energy: Math.round(v.energy * 100),
+      danceability: Math.round(v.danceability * 100),
+      bpm: Math.round((v.tempo * 120) + 60),
+      kinetic: read.kinetic,
+      intensityLabel: read.intensityLabel,
+    }
+  } catch (err) {
+    console.warn(`[KINETICS] read failed, metaphor will run without physical-state guidance: ${err?.message || err}`)
+    return null
+  }
+}
+
 // Text model for scene writing. Note: there is no plain `gemini-3.1-flash` text
 // model published on the API — the 3.1 flash family is image/tts/live only — so
 // scene writing stays on 2.5-flash.
@@ -339,97 +371,93 @@ function buildFluxPrompt(technique, scene) {
 /**
  * IMAGE MODEL SIMPLIFICATION LAYER.
  *
- * The `aestheticSystemPrompt()` output is 200+ words for Gemini to reason through.
- * Image models (Flux, Sana, Pollinations) work MUCH better on SHORT, CLEAR prompts
- * that name the actual scene first, then technique/style as secondary.
+ * The assembled aesthetic prompt is ~2000 chars written for a REASONING model.
+ * Image models (Cloudflare Leonardo/Lucid, FLUX, Sana, and whatever we swap in
+ * next) behave differently: attention is finite and front-loaded, so every
+ * sentence that is not the picture competes with the picture. Layout and
+ * typography instructions are the worst offenders — "a vertical column of quiet
+ * space along one edge for stacked typography" makes a diffusion model render
+ * dead bands or literal text, and it buys nothing a 1:1 canvas doesn't give.
  *
- * This extracts the core narrative prose from the verbose prompt and rebuilds it
- * as something image models can actually execute. Logs exactly what was extracted
- * and what's being sent.
+ * This used to regex-guess which sentences were "the narrative", which failed
+ * badly: its place-word heuristic matched on "edge"/"frame", so on a real
+ * generation it grabbed the composition and format boilerplate as narrative,
+ * dropped the scene's second sentence, and — critically — dropped the infrared
+ * LIGHTING and COLOR fragments entirely. The thermal rendering instructions
+ * never reached the model, which is exactly why technique fidelity kept
+ * scoring ~3/10 while the metaphor scored ~9/10.
  *
- * @param {string} aestheticPrompt the full verbose prompt from buildFinalPrompt()
- * @param {string} technique the TECHNIQUE_SUFFIXES key
- * @returns {string} short, image-model-friendly prompt
+ * So it no longer parses prose at all. We already KNOW every part, because we
+ * assembled them: the scene text is passed in, and `dna.selections` holds each
+ * chosen fragment keyed by layer. We compose deterministically:
+ *
+ *   [MEDIUM] → [SCENE] → [RENDERING: camera/lighting/color/texture] →
+ *   [TECHNIQUE SUFFIX] → [FORMAT + short negatives]
+ *
+ * Rendering fragments are what carry a technique's visual identity, so they are
+ * never dropped. Layout/typography/editorial framing are dropped. The long
+ * anti-AI-tell negative list is compressed — useful, but not worth 400 chars of
+ * a front-loaded attention budget.
+ *
+ * @param {object} args
+ * @param {string} args.scene the complete scene text (never truncated)
+ * @param {object} [args.dna] the Visual DNA whose `.selections` hold the fragments
+ * @param {string} args.technique technique key, for the one-line suffix
+ * @param {string} [args.fallbackPrompt] used only if no dna is available
+ * @returns {string} an image-model-friendly prompt
  */
-/**
- * SIMPLIFIED PROMPT FOR IMAGE MODELS.
- *
- * Core principle: SEMANTIC NUCLEI MUST NEVER BE TRUNCATED.
- *
- * The aesthetic system prompt (200+ words, structured for Gemini reasoning) is
- * NOT what image models should receive. They need:
- * - SCENE NARRATIVE FIRST (complete, never mid-sentence)
- * - TECHNIQUE LANGUAGE SECOND (how to render it)
- * - FORMAT/METADATA LAST
- *
- * This structure works across ANY image model (Cloudflare, FLUX, Claude Vision, etc.)
- * because it prioritizes coherent story over style vocabulary.
- *
- * CRITICAL: Never truncate "vibrates with extreme tension" to "vibrates with ext".
- * If the scene is too long, cut at sentence boundaries, never mid-word.
- */
-function simplifyForImageModel(aestheticPrompt, technique) {
-  console.log('[SIMPLIFY] input prompt length:', aestheticPrompt.length, 'chars')
-
-  // Split into complete sentences to find the CORE NARRATIVE
-  // (subject + action + location/environment — the actual story)
-  const allSentences = aestheticPrompt.split(/(?<=[.!?])\s+/)
-  let narrativeSentences = []
-
-  for (const sent of allSentences) {
-    const trimmed = sent.trim()
-    const lower = trimmed.toLowerCase()
-
-    // Skip instructions, all-caps rules, style metadata
-    if (trimmed.toUpperCase() === trimmed) continue
-    if (trimmed.startsWith('Do NOT') || trimmed.startsWith('ONLY') || trimmed.startsWith('This')) continue
-    if (trimmed.startsWith('-') || trimmed.startsWith('*')) continue
-    if (trimmed.includes('RELEVANCE MANDATE') || trimmed.includes('TECHNIQUE')) continue
-
-    // Keep sentences with CONCRETE ACTION or PLACE (the story)
-    const hasAction = /\b(caught|gripping|splayed|straining|stretched|pressed|leaning|standing|running|moving|halting|ending|terminating|streaking|pulling|pushing|reaching|glancing|emerging|disappearing|fading|vibrates|trembles|flows|churns)\b/i.test(lower)
-    const hasPlace = /\b(street|bus|window|room|landscape|field|water|sky|light|darkness|intersection|platform|edge|surface|canal|dock|intersection|frame)\b/i.test(lower)
-    const isSubject = /^(a |an |the |A |An |The |[A-Z]\w+\s)/.test(trimmed)
-
-    if ((hasAction || hasPlace) && isSubject && trimmed.length > 20) {
-      narrativeSentences.push(trimmed)
-      // Collect until we have the full story (usually 1-3 sentences)
-      if (narrativeSentences.length >= 3) break
-    }
+function simplifyForImageModel({ scene, dna, technique, fallbackPrompt, noPeople = false }) {
+  const frag = (key) => {
+    const s = dna && dna.selections && dna.selections[key]
+    return s && s.fragment ? s.fragment.trim().replace(/\.$/, '') : ''
   }
 
-  // Build COMPLETE scene narrative from full sentences
-  // NEVER truncate mid-word or mid-concept
-  let coreScene = narrativeSentences.join(' ')
-
-  // Fallback: if no narrative sentences found, extract first non-style block
-  if (!coreScene || coreScene.length < 50) {
-    const blocks = aestheticPrompt.split(/\n\n+/)
-    for (const block of blocks) {
-      const t = block.trim()
-      if (t.length > 40 && !t.toUpperCase().match(/^[A-Z\s&-]+$/) &&
-          !t.includes('Do NOT') && !t.includes('MANDATE')) {
-        coreScene = t
-        break
-      }
-    }
+  // No DNA (legacy/failed-engine path) — send the scene plus the technique
+  // suffix rather than the 2000-char reasoning prompt.
+  if (!dna || !dna.selections) {
+    const legacy = [
+      (scene || fallbackPrompt || '').trim(),
+      TECHNIQUE_SUFFIXES[technique] || '',
+      'A 1:1 square album cover. No text, letters, watermarks or logos.',
+    ].filter(Boolean).join(' ')
+    console.log('[SIMPLIFY] no DNA available — legacy scene+suffix path')
+    console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:')
+    console.log(legacy)
+    return legacy
   }
 
-  // Extract technique vocabulary (this is the ONLY place technique language goes)
-  const techniqueLang = TECHNIQUE_SUFFIXES[technique] || ''
+  const medium = frag('artMedium')
 
-  // REBUILD: SCENE-FIRST STRUCTURE FOR ALL IMAGE MODELS
-  // This order works across Cloudflare, FLUX, Claude Vision, future models
-  const simplified = [
-    coreScene.trim(),  // COMPLETE scene, never truncated
-    techniqueLang,     // Technique language
-    '1:1 square cover, intentional and authentic.'
-  ].filter((s) => s && s.length > 0).join(' ')
+  // The technique's visual identity lives here. Never dropped.
+  const rendering = [frag('camera'), frag('lens'), frag('lighting'), frag('color'), frag('texture')]
+    .filter(Boolean)
+    .join(', ')
 
-  console.log('[SIMPLIFY] narrative sentences:', narrativeSentences.length)
-  console.log('[SIMPLIFY] core scene length:', coreScene.length, 'chars (COMPLETE, no truncation)')
-  console.log('[SIMPLIFY] final simplified prompt length:', simplified.length, 'chars')
-  console.log('[SIMPLIFY] STRUCTURE: [SCENE] → [TECHNIQUE] → [FORMAT]')
+  const suffix = TECHNIQUE_SUFFIXES[technique] || ''
+
+  const parts = [
+    medium ? `${medium}.` : '',
+    (scene || '').trim().replace(/\.+$/, '.'),
+    rendering ? `${rendering}.` : '',
+    suffix,
+    // The full reality tail is dropped above, but its subject-count guard is a
+    // real safety property (unwanted second person / crowd), so it is kept in
+    // short form rather than lost with the rest of the negatives.
+    noPeople
+      ? 'No people at all in frame — no person, figure, silhouette or hands.'
+      : 'Exactly one person in frame, no second person, no crowd.',
+    'A 1:1 square album cover, edge to edge. No text, letters, watermarks or logos. No waxy plastic skin, no malformed hands, no over-smoothed CGI.',
+  ].filter(Boolean)
+
+  const simplified = parts.join(' ').replace(/\s+/g, ' ').trim()
+
+  console.log('[SIMPLIFY] composed from DNA (no prose parsing)')
+  console.log('[SIMPLIFY] medium:', medium || '(none)')
+  console.log('[SIMPLIFY] scene chars:', (scene || '').length, '(complete)')
+  console.log('[SIMPLIFY] rendering fragments kept:', rendering ? rendering.length : 0, 'chars')
+  console.log('[SIMPLIFY] dropped: composition, typography, editorial, graphic-layout, long negatives')
+  console.log('[SIMPLIFY] final length:', simplified.length, 'chars')
+  console.log('[SIMPLIFY] STRUCTURE: [MEDIUM] → [SCENE] → [RENDERING] → [TECHNIQUE] → [FORMAT]')
   console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:')
   console.log(simplified)
 
@@ -539,6 +567,7 @@ async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistCo
     generate: geminiRawText,
     userFeeling: userInput,
     context: sonicFeatures,
+    kinetics: buildKinetics(features, null, userInput),
   })
   const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(features), hasPerson), technique, metaphor })}
 
@@ -643,6 +672,7 @@ const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.g
       generate: geminiRawText,
       userFeeling: basic_input,
       context: emotionalRegister,
+      kinetics: buildKinetics(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId),
     })
 
     const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
@@ -819,6 +849,7 @@ router.post('/transcribe', requireAuth, async (req, res) => {
         generate: geminiRawText,
         userFeeling: userVibeInput,
         context: emotionalRegister,
+        kinetics: buildKinetics(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId),
       })
       promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
@@ -839,6 +870,7 @@ ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : 
         generate: geminiRawText,
         userFeeling: `${userVibeInput}. ${distilledTheme}`,
         context: emotionalRegister2,
+        kinetics: buildKinetics(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId),
       })
       promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson2), technique, metaphor: metaphor2 })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
@@ -972,7 +1004,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    const { prompt: absoluteFluxPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+    const { prompt: absoluteFluxPrompt, dna: promptDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       // Same family the scene writer was briefed on, so the assembled
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
@@ -994,7 +1026,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     // Simplify the verbose aesthetic prompt into something image models can
     // actually execute — short, subject-first, no 200 lines of reasoning.
-    const simplifiedPromptForModel = simplifyForImageModel(absoluteFluxPrompt, technique)
+    const simplifiedPromptForModel = simplifyForImageModel({ scene, dna: promptDna, technique, fallbackPrompt: absoluteFluxPrompt, noPeople: artistNoPeople || resolvedHasPerson === false })
     console.log(`[IMAGE-ENGINE] simplified prompt ready (${simplifiedPromptForModel.length} chars)`)
     console.log(`[IMAGE-ENGINE] sample: "${simplifiedPromptForModel.substring(0, 150)}..."`)
 
@@ -1131,6 +1163,7 @@ router.patch('/refine', requireAuth, async (req, res) => {
       generate: geminiRawText,
       userFeeling: modRequest || existingBrief?.scene || '',
       context: trackSonicFeatures,
+      kinetics: buildKinetics(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest || existingBrief?.scene || ''),
     })
 
     const refinementPrompt = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), refineHasPerson), technique, metaphor: refineMetaphor })}
@@ -1153,7 +1186,7 @@ INPUT REFINEMENT VARIABLES:
       scene = refineFallback
     }
 
-    const { prompt: absoluteFluxRefinedPrompt } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+    const { prompt: absoluteFluxRefinedPrompt, dna: refinedDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       // Same family the scene writer was briefed on, so the assembled
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
@@ -1173,7 +1206,7 @@ INPUT REFINEMENT VARIABLES:
     console.log(`[REFINE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline. ID: ${generationId} technique=${technique}`);
 
     // Simplify the verbose aesthetic prompt (same as in POST / above).
-    const simplifiedRefinedPrompt = simplifyForImageModel(absoluteFluxRefinedPrompt, technique)
+    const simplifiedRefinedPrompt = simplifyForImageModel({ scene, dna: refinedDna, technique, fallbackPrompt: absoluteFluxRefinedPrompt, noPeople: refineNoPeople || refineHasPerson === false })
     console.log(`[REFINE-ENGINE] simplified prompt ready (${simplifiedRefinedPrompt.length} chars)`)
     console.log(`[REFINE-ENGINE] sample: "${simplifiedRefinedPrompt.substring(0, 150)}..."`)
 

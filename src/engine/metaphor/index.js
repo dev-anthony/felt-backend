@@ -26,11 +26,88 @@
  * before this layer existed.
  */
 
-function buildMetaphorPrompt({ userFeeling, context }) {
+/**
+ * The kinetic signal already exists upstream (`readEmotion` computes `kinetic`,
+ * and the register block carries a MOVEMENT line), and it was already reaching
+ * this module inside `context`. The problem was never that it was missing — it
+ * was that the MOVEMENT line is written for the SCENE WRITER and is phrased
+ * entirely in terms of a human body: "the body must read as physically in
+ * motion (mid-step, mid-turn, mid-sway, fabric and hair moving)". Handed to a
+ * metaphor generator that we deliberately push toward objects, materials and
+ * places, that line is either inert (there is no body to move) or actively
+ * harmful — it pulls toward inserting a figure purely to satisfy the motion
+ * instruction. It also arrives labelled "secondary", so it is pre-weakened.
+ *
+ * This gives the kinetic signal its own statement, phrased as the physical
+ * condition of MATTER rather than of a body, and separates two things the
+ * previous phrasing conflated:
+ *
+ *   energy       = how much physical pressure exists inside the emotional idea
+ *   danceability = whether that pressure is social/celebratory motion or not
+ *
+ * That distinction is the whole point. A track at energy 87 with danceability
+ * 41 is under enormous pressure but is NOT a dance record, so the correct
+ * visual is strain, resistance and imminent displacement — not dancing, crowds
+ * or running, which is precisely the generic reflex this engine exists to kill.
+ */
+function buildKineticBlock(kinetics) {
+  if (!kinetics) return ''
+  const { energy, danceability, bpm, kinetic, intensityLabel } = kinetics
+
+  // Three DIFFERENT signals, deliberately not collapsed into one number:
+  //   energy       = how much force is inside the idea (pressure)
+  //   kinetic      = whether that force is visibly moving or held (movement)
+  //   danceability = whether the motion is social/celebratory (flavour)
+  //
+  // An earlier version derived the pressure tier from `kinetic`, which is
+  // `0.55 * archetype.motionBias + 0.45 * vector.motion` — a MOVEMENT signal
+  // that already blends motion in. That produced the self-contradiction
+  // "Musical pressure: MODERATE (energy 87/100)" on the Lose You test, and
+  // told the generator to stay gentle on a track carrying enormous force.
+  // Pressure now comes from energy, movement stays its own axis.
+  const pressure = energy >= 70 ? 'HIGH' : energy >= 40 ? 'MODERATE' : 'LOW'
+  const moving = typeof kinetic === 'number' && kinetic >= 0.65
+  const celebratory = typeof danceability === 'number' && danceability >= 60
+
+  let directive
+  if (pressure === 'HIGH' && celebratory) {
+    directive = 'RELEASE - propulsion, overflow, scatter, something breaking outward or carried faster than it can be held. The momentum is being spent, not resisted.'
+  } else if (pressure === 'HIGH' && moving) {
+    directive = 'FORCEFUL DISPLACEMENT - something is actively being torn, driven, or carried away right now. The force has already won its first inch; this is the moment it is visibly happening, not the moment before.'
+  } else if (pressure === 'HIGH') {
+    directive = 'ACTIVE STRAIN - enormous force held, not released: under load, resisting, vibrating, stretched, gripping, at the instant before something gives. This is force being FOUGHT, not enjoyed and not merely awaited. A serenely poised, perfectly balanced, silent object is WRONG here - that reads as calm anticipation, and this track is well past anticipation.'
+  } else if (pressure === 'MODERATE') {
+    directive = 'MID-CHANGE - actively shifting, already in motion but not violent, caught between two states rather than settled in either. Not a still life, not an explosion.'
+  } else {
+    directive = 'STILL - suspended, weighted, quietly decaying or accumulating. Let stillness hold the frame; do not manufacture motion this track does not have.'
+  }
+
+  const energyBit = typeof energy === 'number' ? ' (energy ' + energy + '/100' + (bpm ? ', ' + bpm + ' BPM' : '') + ')' : ''
+  const danceBit = typeof danceability === 'number' ? ' (danceability ' + danceability + '/100)' : ''
+  const moveBit = typeof kinetic === 'number' ? ' (' + kinetic.toFixed(2) + ')' : ''
+
+  return [
+    '',
+    'PHYSICAL STATE (governs the CONDITION of the metaphor, never its SUBJECT):',
+    '- Force / pressure: ' + pressure + energyBit,
+    '- Visible movement: ' + (moving ? 'HIGH' : 'HELD / RESTRAINED') + moveBit,
+    '- Social, celebratory motion: ' + (celebratory ? 'HIGH' : 'LOW') + danceBit,
+    intensityLabel ? '- Emotional intensity: ' + intensityLabel : '',
+    '- REQUIRED PHYSICAL CONDITION: ' + directive,
+    '',
+    'How to use this - read carefully, this is where this engine usually fails:',
+    '- The artist\'s words decide WHAT the metaphor is about. This block decides only what PHYSICAL CONDITION that thing is in. It must never change the subject.',
+    '- High force with LOW celebratory motion means strain, resistance and imminent displacement. It does NOT mean dancing, running, crowds, parties, nightlife or speed - those need the artist\'s own words to call for them.',
+    '- Do NOT add a human figure in order to express force. An object under load, a material giving way, or a place being acted on carries pressure better than a person moving, and a figure added for movement alone is the single most generic result this system can produce.',
+    '- Force can be structural rather than athletic: a cable under tension, a surface fracturing, liquid breaking its meniscus, a joint slipping, a weight shifting past its tipping point, a seam starting to part.',
+    '',
+  ].filter(function (l) { return l !== '' || true }).join('\n')
+}
+function buildMetaphorPrompt({ userFeeling, context, kinetics }) {
   return `You are a visual metaphor generator for album cover art. Your ONLY job: turn an emotional truth into ONE physical image — not a photograph yet, not a staged scene, just the IMAGE that could only mean this.
 
 ARTIST'S OWN WORDS (the primary source — read this first): "${userFeeling}"
-${context ? `\nADDITIONAL CONTEXT (secondary — use only to refine, never to override the words above):\n${context}\n` : ''}
+${context ? `\nADDITIONAL CONTEXT (secondary — use only to refine, never to override the words above):\n${context}\n` : ''}${buildKineticBlock(kinetics)}
 Generate 4 distinct visual metaphors: specific, nameable physical objects, materials or situations that embody this emotional truth WITHOUT illustrating the artist's words literally.
 
 Rules:
@@ -73,7 +150,7 @@ function parseMetaphors(rawText) {
  * @param {string} [context] optional secondary context (EMOTIONAL REGISTER block, sonic features, etc.)
  * @returns {Promise<{ metaphor: string|null, hasPerson: boolean|null, candidates: {image:string,hasPerson:boolean}[] }>}
  */
-async function generateVisualMetaphors({ generate, userFeeling, context }) {
+async function generateVisualMetaphors({ generate, userFeeling, context, kinetics }) {
   const feeling = (userFeeling || '').trim()
   if (!feeling) {
     console.log('[METAPHOR] empty userFeeling, returning null')
@@ -81,7 +158,7 @@ async function generateVisualMetaphors({ generate, userFeeling, context }) {
   }
   try {
     console.log(`[METAPHOR] generating from: "${feeling.substring(0, 80)}..."`)
-    const rawText = await generate(buildMetaphorPrompt({ userFeeling: feeling, context }))
+    const rawText = await generate(buildMetaphorPrompt({ userFeeling: feeling, context, kinetics }))
     const candidates = parseMetaphors(rawText)
     const winner = candidates[0] || null
 
@@ -107,3 +184,5 @@ async function generateVisualMetaphors({ generate, userFeeling, context }) {
 }
 
 module.exports = { generateVisualMetaphors }
+// Exported for tests: the physical-state block is pure and worth asserting directly.
+module.exports.buildKineticBlock = buildKineticBlock
