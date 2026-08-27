@@ -192,10 +192,10 @@ const LIGHTING = [
     anchor: { darkness: 0.55, intimacy: 0.45, motion: 0.4 },
     techniques: ['DUOTONE_COLOR_WASH'] },
   { id: 'light_infrared_sensor', category: 'lighting', tags: ['infrared', 'thermal', 'false-color', 'night-vision'],
-    fragment: 'no visible-spectrum lighting at all — heat and infrared signature render the scene, faces reading as false-color thermal blooms rather than lit skin',
-    // See color_infrared_false — same reasoning, this concept's own creative
-    // read of the technique for a scene with no face to bloom in false color.
-    noPeopleFragment: 'no visible-spectrum lighting at all — heat and infrared signature render the scene, the object\'s own warmth reading as a false-color thermal bloom against a cold ambient field rather than any lit surface',
+    // See color_infrared_false for the verified reasoning: name the real
+    // imaging genre (FLIR footage), not an abstract technical instruction.
+    fragment: 'no visible-spectrum lighting at all — a real FLIR thermal camera reads the scene\'s own heat instead, faces reading as bright false-color thermal blooms rather than lit skin',
+    noPeopleFragment: 'no visible-spectrum lighting at all — a real FLIR thermal camera reads the scene\'s own heat instead, the object\'s own warmth reading as a bright false-color thermal bloom against a cold ambient field rather than any lit surface',
     anchor: { darkness: 0.75, aggression: 0.5, valence: 0.15, brightness: 0.3 },
     techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
 ]

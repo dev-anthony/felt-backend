@@ -152,15 +152,37 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
       : all
 
     // MEDIUM AGREEMENT.
-    // The scene is written BEFORE the technique is known, so it has already
-    // committed to a medium family ("you write ONE rendered moment"). If the
-    // per-technique scoring here then picked a different family, the prompt
-    // would describe a photograph and label it a 3D render — the exact
-    // contradiction this constraint exists to prevent. When the caller states
-    // the family the scene was written for, the medium layer must stay inside it.
-    if (layer.key === 'artMedium' && opts.mediumFamily) {
-      const inFamily = candidates.filter((c) => conceptMediumFamily(c) === opts.mediumFamily)
-      if (inFamily.length) candidates = inFamily
+    // TECHNIQUE-MEDIUM AUTHORITY.
+    // `opts.mediumFamily` is a PRE-technique guess — deriveSceneMode() marginalises
+    // across all techniques before any single one is chosen, purely to brief the
+    // scene writer on "you write ONE rendered moment". It is not a claim about
+    // what the eventually-chosen technique actually needs.
+    //
+    // A real generation exposed the gap: deriveSceneMode's guess landed on
+    // 'illustration', INFRARED_THERMAL was then chosen as the technique, and the
+    // artMedium layer (filtered only against that stale illustration guess) picked
+    // `medium_screenprint` ("a bold screen-print with flat color blocking and
+    // halftone dots") sitting in the same prompt as "A real infrared or
+    // thermal-sensor capture, not a color-graded imitation of one" — a screen-print
+    // declared to be a real sensor capture. Every technique's own suffix asserts
+    // real-camera/sensor capture and explicitly rules out illustration ("not a
+    // digital collage effect", "in-camera", "nothing abstracted", "not a
+    // color-graded imitation") — there is currently no technique in this library
+    // that a screen-print, risograph or collage medium is actually compatible
+    // with. So once a real technique is known, IT is authoritative over the
+    // stale pre-technique guess for medium family, not the other way around.
+    const techniqueRequiresPhoto = technique && TECHNIQUES[technique] &&
+      !TECHNIQUES[technique].allowsIllustration && !TECHNIQUES[technique].allowsCGI
+    const effectiveMediumFamily = techniqueRequiresPhoto ? 'photo' : opts.mediumFamily
+
+    if (layer.key === 'artMedium' && effectiveMediumFamily) {
+      const inFamily = candidates.filter((c) => conceptMediumFamily(c) === effectiveMediumFamily)
+      if (inFamily.length > 0) {
+        if (techniqueRequiresPhoto && opts.mediumFamily && opts.mediumFamily !== 'photo') {
+          console.log(`[DNA-TECHNIQUE] ${technique} requires photo medium, overriding pre-technique guess of '${opts.mediumFamily}'`)
+        }
+        candidates = inFamily
+      }
     }
 
     // GRAPHIC/MEDIUM AGREEMENT.
@@ -174,11 +196,11 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
     // minimal-luxury layout) are genuinely medium-agnostic and must stay
     // eligible everywhere — only the few that make an explicit competing medium
     // claim need excluding, not the whole category.
-    if (layer.key === 'graphic' && opts.mediumFamily) {
+    if (layer.key === 'graphic' && effectiveMediumFamily) {
       const compatible = candidates.filter((c) => {
         const t = c.tags || []
-        if (t.includes('photographic') && opts.mediumFamily !== 'photo') return false
-        if (t.includes('risograph') && opts.mediumFamily === 'photo') return false
+        if (t.includes('photographic') && effectiveMediumFamily !== 'photo') return false
+        if (t.includes('risograph') && effectiveMediumFamily === 'photo') return false
         return true
       })
       if (compatible.length) candidates = compatible

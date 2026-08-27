@@ -119,6 +119,12 @@ Rules:
 - Order best-first — the metaphor a sharp art director would pick as the single most striking, specific image for THIS emotional truth, not the safest one. A more original object-only image should beat a generic person-based one.
 - For each metaphor, honestly tag whether it involves a person or any body part (hand, eyes, silhouette) at all.
 
+Reality Requirement (this is why generated covers read as "AI art" — read carefully):
+- Tension must come from the object's ACTUAL PHYSICAL BEHAVIOUR (mass, load, weight, wear, corrosion, geometry, material fatigue), never from a decorative symbol added on top of it. A structure visibly straining under real weight is the metaphor. Glowing cracks, energy veins, lightning-branch fissures, floating particles, magical smoke, or light "leaking" from damage are NOT — they are illustration tropes bolted onto a photograph, and they are the single most common tell that gives an image away as AI-generated rather than photographed.
+- Ask: "could a photographer have found and shot this in the real world?" Real cracks are irregular, follow stress/joints/aggregate, and do not glow, branch symmetrically, or radiate like veins. If a detail could only exist as a rendered effect (glowing lines, particle auras, energy fields), cut it.
+- Never decorate an object with a symbol of the emotion. Let the object's real material state under real physical conditions BE the emotion — a cable at the exact tension before it parts, a joint visibly carrying more than it was built for, a surface worn through by repeated contact — described the way a documentary photographer would describe what they actually saw, not the way an illustrator would embellish it.
+- Prefer the physically plausible over the visually dramatic. A subtle, correct detail (a single strained rivet, a hairline gap widening at one point) beats an obviously invented dramatic one (a whole surface erupting in glowing fissures) every time.
+
 Diversity Requirement (CRITICAL):
 - Your 4 metaphors must come from 4 DIFFERENT domains/types. Do NOT output 3 variations of the same idea.
 - Types include: objects, weather, landscape, nature/materials, animals, architecture, light/weather, abstract phenomena, decay/growth, bodies/hands, water, fire/heat, plant/organic, geometric/structures, etc.

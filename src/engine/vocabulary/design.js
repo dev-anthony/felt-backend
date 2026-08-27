@@ -82,13 +82,19 @@ const COLOR_SYSTEMS = [
     anchor: { euphoria: 0.65, energy: 0.6, valence: 0.6 },
     techniques: ['STUDIO_SEAMLESS_EDITORIAL'] },
   { id: 'color_infrared_false', category: 'color', tags: ['infrared', 'false-color', 'thermal'],
-    fragment: 'false-color infrared rendering — heat-signature reds/whites against cold monochrome green or blue, nothing reading as natural skin tone',
-    // A no-people cover has no skin for this fragment's own reference point to
-    // mean anything — the thermal concept doesn't disappear, it just maps onto
-    // whatever IS in frame: friction heat, retained warmth, a cooling edge.
-    noPeopleFragment: 'false-color infrared rendering — heat-signature reds/whites bleeding from the object\'s warmest point out into cold monochrome green or blue at its coolest edges, its own residual heat and friction mapped in false color rather than skin',
+    // Verified against real generations: abstract technical language ("genuine
+    // thermal-sensor resolution", "low-resolution and blurred") was IGNORED by
+    // the image model — output stayed full-detail and sharp regardless. Naming
+    // the actual real-world reference class ("FLIR thermal-camera footage",
+    // "ironbow heat palette" — the specific black/purple/blue/orange/yellow/
+    // white LUT real thermal cameras use) got an immediate, unmistakable
+    // correct result on the first try. The model has strong training data on
+    // recognizable real imaging genres; it has much weaker data for "a photo,
+    // but technically blurry" as an abstract instruction.
+    fragment: 'shot as genuine FLIR thermal-camera footage using the classic ironbow heat palette — black and deep purple for the coldest zones, shifting through blue, then a hot core of orange, yellow and white at the warmest points, nothing reading as natural skin tone or normal photographic color',
+    noPeopleFragment: 'shot as genuine FLIR thermal-camera footage using the classic ironbow heat palette — black and deep purple for the coldest zones, shifting through blue, then a hot core of orange, yellow and white radiating from the object\'s own warmest point, its residual heat and friction mapped in true thermal false-color rather than skin',
     anchor: { darkness: 0.65, aggression: 0.45, valence: 0.2, brightness: 0.4 },
-    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2' },
+    techniques: ['INFRARED_THERMAL'], source: 'FELT technique library v2 — reference-genre fix verified 2026-08-27' },
 ]
 
 /** @type {import('../types').VocabularyConcept[]} */
