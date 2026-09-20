@@ -143,7 +143,7 @@ function assemblePrompt({ blueprint, dna, allowGroup = false, symbolismMinConfid
     // 11. Narrative beat (kept last of the story so it colors nothing technical)
     b.narrative ? sentence([`the moment reads as ${b.narrative}`]) : '',
     // 12. Technique suffix — verbatim from the legacy system, photographic only
-    photographic ? getSuffix(technique) : '',
+    photographic ? getSuffix(technique, { noPeople }) : '',
     // 13. Photographic Reality Engine tail (believability + AI-tell negatives).
     //     Doubles as the quality tail. Single-subject unless the caller opts into
     //     a group (default guards against the common unwanted-second-person leak).

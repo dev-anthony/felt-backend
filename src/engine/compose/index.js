@@ -62,7 +62,7 @@ function clean(fragment) {
  */
 function composeImagePrompt({ scene, dna, technique, noPeople = false, budget = DEFAULT_BUDGET }) {
   const story = String(scene || '').trim().replace(/\.+$/, '.')
-  const suffix = getSuffix(technique) || ''
+  const suffix = getSuffix(technique, { noPeople }) || ''
 
   const tail = [
     noPeople

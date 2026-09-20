@@ -58,6 +58,8 @@ const TECHNIQUES = {
   },
   SILHOUETTE_ATMOSPHERE: {
     suffix: 'The light source, not the face, is the subject of the photograph.',
+    // On a cover with no person, "not the face" still puts a face in the prompt.
+    noPeopleSuffix: 'The light source is the subject of the photograph.',
     dnaBias: { darkness: +0.12, intimacy: +0.05 },
     graphic: ['graphic_clean_photo'],
     purpose: 'Trade identity for form — the shape and the light around it carry the meaning instead of the face.',
@@ -176,6 +178,8 @@ MONUMENTAL_SCALE_ISOLATION: {
     // MONUMENTAL_SCALE_ISOLATION (dwarfed to near-abstraction). Here the person
     // stays legible and specific, just placed inside a large truthful place.
     suffix: 'A wide, truthful view of a real place with a real person inside it — nothing staged, nothing abstracted.',
+    // "with a real person inside it" directly contradicts a no-people cover.
+    noPeopleSuffix: 'A wide, truthful view of a real place — nothing staged, nothing abstracted.',
     dnaBias: { grit: +0.06, warmth: +0.04 },
     graphic: ['graphic_clean_photo'],
     purpose: 'Place a specific, identifiable person inside a large, truthful environment — the place tells as much of the story as the person does.',
@@ -633,8 +637,15 @@ function isValidTechnique(name) {
   return Object.prototype.hasOwnProperty.call(TECHNIQUES, name)
 }
 
-function getSuffix(name) {
-  return (TECHNIQUES[name] || TECHNIQUES[DEFAULT_TECHNIQUE]).suffix
+/**
+ * The technique's one-line description of what kind of act the image was.
+ * `noPeople` selects the variant for covers with no human subject — a handful
+ * of suffixes mention a face or "a real person inside it", which on an object
+ * cover both contradicts the no-people guard and invites the model to add one.
+ */
+function getSuffix(name, { noPeople = false } = {}) {
+  const t = TECHNIQUES[name] || TECHNIQUES[DEFAULT_TECHNIQUE]
+  return noPeople && t.noPeopleSuffix ? t.noPeopleSuffix : t.suffix
 }
 
 function getDnaBias(name) {

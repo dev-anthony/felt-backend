@@ -18,111 +18,22 @@ const {
   TECHNIQUE_SUFFIXES,
   DEFAULT_TECHNIQUE,
   isValidTechnique,
-  TECHNIQUES,
-  selectTechnique,
   getFallbackTechnique,
 } = require('../engine/technique')
 
 const { genreLineage, subjectModeRule } = require('../config/artistProfile')
+const { aestheticSystemPrompt } = require('../engine/scene/prompt')
 
-// EMOTIONAL INTELLIGENCE LAYER — turns the measured features into an archetype,
-// an aesthetic world and an intensity tier, then hands the scene writer a single
-// clearly-labeled EMOTIONAL REGISTER block. Previously the mood was one clinical
-// line buried among five technical ones, so it steered nothing.
-const { readEmotion, emotionalRegisterBlock } = require('../engine/emotion')
 const { buildFeatureVector } = require('../engine/dna/featureVector')
-// VISUAL METAPHOR LAYER — runs before the scene writer, see engine/metaphor
-// for why: without it, the scene writer defaults straight to the statistically
-// most common scene for the archetype/genre instead of an image specific to
-// this song.
-const { generateVisualMetaphors } = require('../engine/metaphor')
-
-/**
- * MATH-DRIVEN TECHNIQUE SELECTION.
- *
- * Technique is no longer something Gemini picks from a text menu. Emotion
- * interprets the audio (archetype + intensity), then selectTechnique() scores
- * all 15 techniques against that read via the affinity matrix + the track's
- * own movement/chaos signal. Gemini's job is only to write the scene for
- * whichever technique this returns — it never sees a menu.
- */
-function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId) {
-  try {
-    const vector = buildFeatureVector(features)
-    // read.archetypeId ('MELANCHOLY' etc.) and read.intensity ('low'|'medium'
-    // |'high'|'extreme') are both plain strings directly on the return object
-    // — confirmed against engine/emotion/index.js.
-    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId)
-    // A SECOND reading of the feeling when there is one: the artist's explicit
-    // pick from the taxonomy, else what their words are about (read by the
-    // metaphor stage). Audio alone chose INFRARED_THERMAL — a technique whose
-    // own definition says "poor for warmth or tenderness" — for a track whose
-    // words were about holding on to someone loved, every time, because the
-    // audio measured Tension. selectTechnique blends the two readings.
-    const secondary = [read.declaredEmotion?.archetype, read.wordsReading?.id]
-      .find((a) => a && a !== read.archetypeId)
-    const technique = selectTechnique(read.archetypeId, read.correctedVector, {
-      intensity: read.intensity,
-      secondaryArchetypeId: secondary,
-    })
-    console.log(`[TECHNIQUE SELECT] audio=${read.archetypeId} secondary=${secondary || '-'} intensity=${read.intensity} kinetic=${read.kinetic} -> ${technique}`)
-    return technique
-  } catch (err) {
-    console.warn(`[TECHNIQUE SELECT] scoring failed, using fallback: ${err?.message || err}`)
-    return getFallbackTechnique(features ? buildFeatureVector(features) : undefined)
-  }
-}
-
-/** Builds the labeled register block for a track + the artist's own words. */
-function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId, quiet = false) {
-  try {
-    const vector = buildFeatureVector(features)
-    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId)
-    if (quiet) {
-      // caller logs once, for the final read
-    } else if (read.semanticCorrections.length) {
-      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic} | corrections: ${read.semanticCorrections.join('; ')}`)
-    } else {
-      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}` + (read.declaredEmotion ? ` | artist declared "${read.declaredEmotion.label}"` : '') + (read.wordsReading ? ` | words read as "${read.wordsReading.label}"` : ''))
-    }
-    return emotionalRegisterBlock(read, read.correctedVector)
-  } catch (err) {
-    console.warn(`[EMOTION] read failed, continuing without register: ${err?.message || err}`)
-    return ''
-  }
-}
-
-/**
- * Structured kinetic facts for the metaphor generator.
- *
- * `buildEmotionalRegister` already runs `readEmotion` and renders a prose block,
- * but that block's MOVEMENT line is written for the scene writer in body terms
- * ("the body must read as physically in motion"), which is the wrong instruction
- * for an object/material metaphor. Rather than have the metaphor generator parse
- * prose meant for someone else, this hands it the numbers directly.
- *
- * Uses `correctedVector`, so the artist's own words (e.g. "hope") have already
- * moved these values before the metaphor sees them. Deterministic and cheap —
- * readEmotion is pure arithmetic, no API call — so recomputing here rather than
- * threading a second return value through five call sites is the safer trade.
- */
-function buildKinetics(features, declaredGenre, intentText, declaredEmotionId) {
-  try {
-    const vector = buildFeatureVector(features)
-    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
-    const v = read.correctedVector
-    return {
-      energy: Math.round(v.energy * 100),
-      danceability: Math.round(v.danceability * 100),
-      bpm: Math.round((v.tempo * 120) + 60),
-      kinetic: read.kinetic,
-      intensityLabel: read.intensityLabel,
-    }
-  } catch (err) {
-    console.warn(`[KINETICS] read failed, metaphor will run without physical-state guidance: ${err?.message || err}`)
-    return null
-  }
-}
+// COVER PLAN — emotion read + visual metaphor + technique choice, run before the
+// scene writer. See engine/plan (orchestration) and engine/metaphor (why the
+// metaphor stage exists: without it the scene writer defaults straight to the
+// statistically most common scene for the archetype/genre).
+const {
+  resolveTechnique,
+  deriveSceneMode,
+  planCover: planCoverCore,
+} = require('../engine/plan')
 
 // Text model for scene writing. Note: there is no plain `gemini-3.1-flash` text
 // model published on the API — the 3.1 flash family is image/tts/live only — so
@@ -139,6 +50,9 @@ async function geminiRawText(promptText) {
   })
   return response.text?.trim() || ''
 }
+
+// planCover with this route file's Gemini call injected (see engine/plan).
+const planCover = (args) => planCoverCore({ generate: geminiRawText, ...args })
 
 function deserializeBrief(stored, features) {
   if (!stored) return null
@@ -159,264 +73,6 @@ function deserializeBrief(stored, features) {
     // Left unexpanded
   }
   return { technique: fallbackTechnique(), scene: stored, structured: false }
-}
-
-const PERSON_SUBJECT_BLOCK = `SUBJECT CONSTRUCTION (choose WHO fits the song, and make them MEMORABLE):
-- DECIDE WHO belongs here — never default to a young woman. Vary gender every time (masculine, feminine, androgynous — don't repeat the same one across songs). Age stays in an 18-35 range (late teens through mid-30s) — do not depict children or elders. Vary build and cultural context freely within that range.
-- ANATOMY: state build and one or two bone-structure facts so the figure has real mass — "broad-shouldered heavy-set frame", "slight wiry build with prominent collarbones", "soft round face with full cheeks". Never "a figure".
-- SKIN: name a base tone from a real spectrum (porcelain, warm ivory, golden olive, honey-bronze, rich caramel, deep espresso, obsidian and everything between), an undertone (cool rosy, warm golden, neutral, olive, blue-black), and one micro-texture (freckles, visible pores, sun-weathered lines, a healed scar). Match the person and culture; do not always pick the same one.
-- IF a distinctive physical marker is genuinely suggested by THIS song's specific world, include ONE. Do not reach for a lined fade, a nose ring, a gold tooth or a durag as a default checklist — those are clichés, not a formula. Pull the marker (if any) from the song's own cultural and narrative context, or omit it entirely; omitting one is equally correct.
-- WARDROBE WITH WEIGHT: name the garment AND how the fabric behaves under gravity — "a heavy structured wool coat cinched at the waist, pooling over the hips", not "a red dress"; "an oversized drop-shoulder hoodie stacking sharply at the wrists", not "streetwear". Real fabrics: aso-oke, velvet, wax-print, raw denim, leather, heavy knit, satin, mesh, tailored wool.
-- Keep the person to a few vivid concrete facts. Do not list every feature — leave room for the world and the action.
-- BANNED words for people: "beautiful", "stunning", "gorgeous", "attractive", "perfect", "athletic", "sculptural", "high-fashion figure", "enigmatic", "mysterious figure", "a person", "someone", "cool outfit", "stylish".
-- The face is LIT and clearly visible. Never describe it as shadowed, hidden, obscured or turned away UNLESS the technique is SILHOUETTE_ATMOSPHERE or MONUMENTAL_SCALE_ISOLATION.`
-
-const ABSENT_SUBJECT_BLOCK = `OBJECT / ABSTRACT CONSTRUCTION (this cover has NO human figure — that is deliberate):
-- The Visual DNA has determined this song is carried by a thing, a place or a material rather than a person. Do not add a figure, a silhouette, a pair of hands or a body part at the frame's edge. Nobody is in this picture.
-- Choose ONE concrete subject and commit to it entirely: a single object loaded with the song's meaning, one material caught in a specific state, or one structure. It must be specific and nameable — "a cracked terrazzo stairwell", "a half-drunk glass of palm wine going warm", "a coil of magnetic tape pulled out of its shell" — never "an object" or "a texture".
-- Give it PHYSICALITY: what it is made of, how it has been used, what time has done to it. Chips, wear, fingerprints, dust, condensation, heat damage, repair. An object with no history reads as stock.
-- Give it SCALE and PLACEMENT: whether we are inches from it or across a room, and what it sits on or in. Emptiness around it is a decision, not an absence.
-- Give it a MOMENT: even without a person something is happening — steam still rising, liquid still moving, dust still falling, light crossing it as it shifts. A dead still-life is the failure mode here, exactly as a static portrait is in the human version.
-- BANNED words: "beautiful", "stunning", "ethereal", "abstract shapes", "an object", "a surface", "some kind of", "mysterious".`
-
-/**
- * The scene-writer's system prompt.
- *
- * Built per request rather than fixed, because two decisions the Visual DNA has
- * already made change what a good scene even IS:
- *
- *   mediumFamily — a cover destined for a 3D render or a printed illustration
- *     should not be written as a photograph. The old fixed prompt opened with
- *     "you write ONE photographic moment" regardless, so a CGI track got a
- *     photographic scene welded to a "hyper-glossy 3D render" medium fragment:
- *     two mediums in one prompt.
- *
- *   subjectMode — the DNA selects `subj_absent` ("no human figure at all") on
- *     roughly 9% of tracks, and Module 1's upper-intensity cells are frequently
- *     objects or abstractions ("macro technical framing inside a luxury watch
- *     movement", "elimination of literal physical assets"). The fixed prompt
- *     demanded a person every time, so those cells were unreachable and
- *     `subj_absent` was effectively dead. This swaps in an object/abstract
- *     construction block of equal rigour instead.
- *
- * Only the DNA's own signal may trigger `absent` — never a general licence.
- * A faceless abstract cover is right for a Cerebral IDM record and wrong for an
- * Afrobeats single, and the DNA already encodes that difference.
- */
-const MEDIUM_BRIEF = {
-  photo: {
-    opener: 'You write ONE photographic moment.',
-    execution: 'photography',
-    forbid: 'cameras, lenses, film stock, lighting, shadows, rim light, colour grade, hue, grain, exposure, vignette or post-processing',
-  },
-  cgi: {
-    opener: 'You write ONE rendered moment. This cover will be BUILT as a 3D render, not photographed — so think in surfaces, materials and constructed space, not in what a camera happened to catch.',
-    execution: 'rendering',
-    forbid: 'cameras, lenses, film stock, render engines, shaders, ray-tracing, subsurface scattering, lighting rigs, colour grade or post-processing',
-  },
-  illustration: {
-    opener: 'You write ONE illustrated moment. This cover will be DRAWN and printed, not photographed — so think in shapes, gesture and graphic clarity, not in optical accident.',
-    execution: 'illustration',
-    forbid: 'cameras, lenses, film stock, ink weights, screentone, halftone, print texture, colour grade or post-processing',
-  },
-}
-
-function aestheticSystemPrompt({ mediumFamily = 'photo', subjectMode = 'person', technique, metaphor } = {}) {
-  const M = MEDIUM_BRIEF[mediumFamily] || MEDIUM_BRIEF.photo
-  const subjectBlock = subjectMode === 'absent' ? ABSENT_SUBJECT_BLOCK : PERSON_SUBJECT_BLOCK
-  const techniqueName = TECHNIQUES[technique] ? technique : DEFAULT_TECHNIQUE
-  const t = TECHNIQUES[techniqueName]
-  return `You are the art director for a real recording artist's single cover. ${M.opener} You do not write poetry, mood boards, or explanations.
-
-Everything you write must serve one goal: someone who has heard this song should look at the cover and recognise it. Not "a nice image" — THIS song's image.
-
-RELEVANCE MANDATE (READ THIS FIRST — this is the entire job):
-- The artist's own words below are the PRIMARY source for the subject, place and action. Work out what physical situation actually embodies what they said — not the closest genre stereotype, not the most common interpretation, THIS specific thing.
-- Any example locations, props or imagery named further down in this brief are illustrations of a STYLE, never a menu. Do not default to one just because it is concrete and easy to reach for. If nothing on those lists fits what the artist actually described, ignore all of them and invent something that does.
-- A high tempo or high energy reading describes HOW FAST the song is, not WHAT IT IS ABOUT. Never let tempo/energy alone justify a location or an activity (a club, a party, dancing) that the artist's own words don't support.
-- Never fall back on a generic default (a lone figure in a dim room, someone staring out a rain-streaked window) unless the theme is literally that.
-- Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object — derived from the artist's words, not assembled from this brief's example lists.
-
-An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it to understand the register, the aesthetic world, the intensity tier, the MOVEMENT line, and the VISUAL DIRECTION — this informs HOW you execute the scene, not WHAT the scene is.
-- VISUAL DIRECTION describes the mood, world and materials this combination calls for. Let it steer WHAT KIND OF PLACE, weather, time of day and physical state you stage — but never write lighting, palette, composition or texture words yourself: the rendering system reads the same direction separately and applies it.
-- If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it — but only if it doesn't contradict the artist's actual words.
-
-${metaphor ? `
-VISUAL METAPHOR (MANDATORY — this is the image, not a suggestion):
-${metaphor}
-This is the physical image that embodies the artist's emotional truth. Build the entire scene around this image. It is the subject of the cover, not decoration inside it — do not replace it with a literal illustration of the artist's words or a generic scene for this genre. If a person appears, they are staged interacting with this image, not standing next to a version of it that could be swapped out. If the metaphor describes an object or material with no person in it, that is correct — do not add a figure just to have one.
-` : ''}
-
-LOCKED TECHNIQUE (already chosen mathematically — do NOT choose another, do NOT name it, do NOT output a TECHNIQUE line):
-- ${techniqueName} — ${t.purpose}
-- Typical subjects (illustrations of a style, never a menu): ${t.bestFor.join('; ')}
-- Common mistake to avoid: ${t.commonMistakes}
-- THE TECHNIQUE IS APPLIED BY A SEPARATE RENDERING SYSTEM AFTER YOU. Your only job is to stage a scene that a photographer using this method would naturally choose to shoot: the place, the subject, the moment. Never describe the look itself — no thermal, infrared or false-colour words, no exposure, blur, grain, film or lens words, no colour palette, no "rendered in". If you describe the look, the image ends up carrying two competing versions of it and the model follows the wrong one. The artist's words decide WHAT the scene is; the technique never changes that.
-
-REAL, NOT RENDERED (this is why generated covers read as AI — enforced, and a scene that breaks it is rejected and rewritten):
-- Describe only what physically exists and what it is physically doing: material, wear, weight, load, weather, what is moving or about to give. Never add effects — no glow or luminous light, no networks, webs or veins of cracks, no floating particles, no energy, aura or magic. A photographer can only photograph what is there.
-- Tension comes from the thing's real behaviour (a cable at the exact load before it parts, a joint carrying more than it was built for), never from a symbol drawn on top of it.
-- ONE dominant subject that would still read as a single clear shape at thumbnail size, with space around it — not a busy scene of many equal elements.
-
-DEPICTING CONNECTION, CHEMISTRY & DESIRE — ONLY IF THE SONG IS LITERALLY ABOUT THIS:
-Apply this section ONLY when the song's actual subject is attraction, wanting someone, dancing with someone, or romantic/sexual chemistry. If the song is about something else — holding on to something slipping away, loss, resistance, ambition, grief, solitude, anger, defiance — IGNORE THIS SECTION ENTIRELY. A fast tempo or high energy reading is NOT the same thing as a song being about connection; do not reach for a club, a crowd, a dancefloor or generic "nightlife energy" imagery just because a track is fast or loud.
-${subjectMode === 'absent' ? `This cover has NO human figure (see the construction rules below) — depict connection entirely through the object or material itself, never by adding a person or body part just to satisfy this section. The charge comes from proximity and implication between things, not from a body:
-- Near-contact, not contact: a magnet held a hair's width from metal, condensation bridging the gap between two glasses, two threads crossing but not yet knotted.
-- Evidence of a presence that just left or hasn't arrived yet: a second cup still warm, a chair pushed back mid-motion, light from two separate sources overlapping on one surface.
-- The object itself changed by something else's presence: wax fused from two candles burned side by side, a scorch mark where two things touched, fabric still holding the shape of a grip that let go.
-Any of these carries real charge without a figure. Choose tension over stillness whenever the register allows it.` : `When the song genuinely is about attraction/chemistry/desire, there is a failure mode to avoid: retreating to a lone figure standing still, touching their own neck or collarbone, eyes closed, "feeling the moment." That image is inert. It communicates nothing about the song and it is the single most common way this system fails.
-Instead, convey connection through ENERGY, MOTION and IMPLICATION:
-- The subject caught mid-dance — weight shifted, hips turned, hair and fabric still moving, feet off the beat.
-- An action that only makes sense because someone else is there: reaching toward the edge of frame, glancing back over a shoulder, laughing at something off-camera, pulling someone's hand that is just out of shot.
-- A charged environment that holds another presence: two shadows cast by one light, a second drink on the table, a crowd blurred close around them, a hand entering the frame's edge.
-- Heat in the room: sweat catching light, a packed floor, condensation, smoke, bodies implied at the frame's border.
-Any of these beats a static portrait. Choose energy over stillness whenever the register allows it.`}
-
-BANNED POSES — these have become defaults and are now forbidden unless the brief explicitly demands them:
-- a hand resting on one's own collarbone, neck or chest
-- eyes closed in serene stillness
-- chin lifted, contemplative, gazing up or into middle distance
-- standing motionless facing the camera with arms at sides
-If your instinct produces one of these, discard it and write an action instead.
-
-${subjectBlock}
-
-ENVIRONMENT & MOMENT (a cover is a PLACE and a MOMENT, not a floating portrait):
-- ONE specific, nameable location with real atmosphere — never "a dimly lit room" or "a dance floor". The location must be the one the artist's own words point to. Nightlife venues (a club, a lounge, a bar) are correct ONLY when the song is actually about a night out, a party or that kind of scene — most songs are not, and reaching for one by default is exactly the genericness this brief exists to prevent. For everything else, name whatever place the actual theme calls for: a kitchen at 3am, a stairwell, a bus stop, a hospital waiting room, a childhood bedroom, a parking lot, a field, a moving car, a rooftop, a laundromat — anywhere a real moment like this would actually happen.
-- ONE or TWO intentional props that tell the story, specific to THIS scene — not stock atmosphere props reached for by habit (a disco ball, a cocktail) unless the location genuinely is that kind of place.
-- Describe a MOMENT OF ACTION — what is HAPPENING. Caught mid-step, glancing back, laughing, adjusting a chain, leaning off a wall, stepping through smoke.
-- Match the AESTHETIC WORLD from the register block: Normal = grounded real places and natural materials; Luxury = premium materials, flawless surfaces, expensive light; Gritty = visible wear, real dirt and sweat, uncorrected light.
-- Match the INTENSITY tier: Low is restrained and quiet; Extra High consumes the frame.
-- BALANCE: give the location and the atmosphere at least as much attention as ${subjectMode === 'absent' ? 'the object or material itself' : 'the person'}.
-${subjectMode === 'absent' ? '' : `
-SUBJECT COUNT (safety):
-- Default to ONE subject in frame. A second person requires explicit justification from the brief (a duo, a named collaboration).
-- Never depict two people embracing, kissing, or in romantic or sexual physical contact, regardless of how romantic the lyrics are. Use the CONNECTION techniques above instead — motion, implication, a charged environment, a hand at the frame's edge. Those are not consolation prizes; they are the stronger image.
-`}
-STORY-ONLY RULE:
-- You write the STORY, never the ${M.execution}. Describe only: what is in frame, where it is, what is physically happening, and at most ONE symbolic object.
-- Do NOT mention ${M.forbid}. A separate system decides every one of those; naming them here corrupts the result.
-- Keep it concrete and physical — real places, real objects, real body language — not abstract adjectives like "melancholic atmosphere" or "meditative energy".
-
-OUTPUT FORMAT (CRITICAL):
-Respond with exactly one thing, nothing else — no label, no preamble, no quotes:
-<2-3 sentence cinematic moment grounded in this song, staged to suit the LOCKED TECHNIQUE above. Name a SPECIFIC location with atmosphere and one or two meaningful props; ${
-    subjectMode === 'absent'
-      ? 'this cover has NO human figure — describe the object, material or place itself and what is physically happening to or around it (not a static object, something in motion or mid-change)'
-      : 'place a specific person inside it — whose gender, age and identity you chose to fit THIS song, with specific wardrobe and, only if it genuinely fits, one distinctive marker'
-  }; and describe what is HAPPENING in the moment (action, not a static pose). Balance world, action and subject roughly equally. No camera, lighting, colour or grain words. No vague descriptors. No lyric excerpts.>`
-}
-
-/**
- * Ask the Visual DNA, before the scene is written, which medium this cover will
- * be executed in and whether it has a human subject at all.
- *
- * Ordering note: Gemini picks the technique, and computeVisualDNA needs one — so
- * this has to answer before the technique exists. It does NOT assume a default.
- * An earlier version previewed with DEFAULT_TECHNIQUE and was wrong: medium is
- * not technique-independent (medium_photography carries a technique bonus, and
- * applyTechniqueBias shifts the vector differently per technique), so a CGI-
- * bound industrial track read as photographic purely because the default
- * happened to be DUOTONE_COLOR_WASH.
- *
- * Instead we marginalise over all ten techniques and take the modal answer:
- * "which medium does this track land in most often, whatever Gemini picks?"
- * Ten DNA passes cost well under a millisecond, and the real DNA is still
- * computed properly afterwards from the technique Gemini actually chose.
- *
- * Best-effort: any failure returns the previous behaviour (photographic, with a
- * person), so a fault here can never block a generation.
- */
-function deriveSceneMode(features) {
-  try {
-    const mediums = {}
-    const subjects = {}
-    for (const t of Object.keys(engine.technique.TECHNIQUES)) {
-      const dna = engine.computeVisualDNA(features, t, { quiet: true })
-      const fam = engine.mediumFamily(dna)
-      mediums[fam] = (mediums[fam] || 0) + 1
-      const sub = dna.selections.subject.conceptId === 'subj_absent' ? 'absent' : 'person'
-      subjects[sub] = (subjects[sub] || 0) + 1
-    }
-    // Photography is FELT's default thesis, so a non-photo medium needs a clear
-    // MAJORITY, not a plurality. A 4/3/3 split is an ambiguous track, and
-    // committing the scene writer to "you write ONE rendered moment" on a
-    // one-technique edge would be a coin flip with a very visible outcome.
-    const total = Object.values(mediums).reduce((a, b) => a + b, 0)
-    const top = Object.entries(mediums).sort((a, b) => b[1] - a[1])[0]
-    const decisive = top && top[1] > total / 2 ? top[0] : 'photo'
-    return {
-      mediumFamily: decisive,
-      // A person is the safe default, so `absent` must win outright rather than
-      // merely tie — a faceless cover is right for a Cerebral IDM record and
-      // wrong for an Afrobeats single.
-      subjectMode: (subjects.absent || 0) > (subjects.person || 0) ? 'absent' : 'person',
-    }
-  } catch (err) {
-    console.warn(`[SCENE MODE] falling back to photo/person: ${err?.message || err}`)
-    return { mediumFamily: 'photo', subjectMode: 'person' }
-  }
-}
-
-/**
- * The winning visual metaphor's own `hasPerson` tag overrides the audio-only
- * subject guess from `deriveSceneMode` — whether a figure belongs in the
- * frame is now a property of the chosen image, not a separate coin flip from
- * the feature vector. Falls back to the audio-derived guess only when the
- * metaphor call produced nothing usable (`hasPerson` is null).
- */
-function resolveSubjectMode(sceneMode, hasPerson) {
-  if (hasPerson === true) return { ...sceneMode, subjectMode: 'person' }
-  if (hasPerson === false) return { ...sceneMode, subjectMode: 'absent' }
-  return sceneMode
-}
-
-/**
- * The shared front half of every route that writes a scene: read the audio,
- * ask the metaphor stage what the artist's WORDS are about and for the image
- * that carries it, choose the technique from BOTH readings, then hand back
- * everything the scene writer needs.
- *
- * This sequence used to be copy-pasted into five call sites (synthesizeSceneBrief,
- * /expand, both /transcribe branches, /refine), and every fix had to be
- * re-applied five times — which is how the technique/words fix, the kinetic
- * block and the subject-mode override each landed in some places and not
- * others. One function means one place.
- *
- * Order matters: the metaphor call comes BEFORE technique selection, because
- * it is the only stage that reads the artist's words as language, and the
- * technique now depends on what it finds. It is one Gemini call either way.
- * If that call fails (quota, outage), `feeling` is null and technique falls
- * back to the audio read alone — exactly the previous behaviour.
- *
- * @param {object} args
- * @param {object} args.features audio features for the upload
- * @param {string|null} args.genreLineage the artist's declared lane
- * @param {string} args.intentText text the emotion layer's semantic cues read
- * @param {string} args.metaphorWords the artist's words handed to the metaphor stage
- * @param {string|null} [args.declaredEmotionId] the artist's pick from the taxonomy
- * @param {string} [args.lockedTechnique] skip technique selection (refine keeps the original look)
- * @param {string} [args.contextFallback] metaphor context if no register can be built
- */
-async function planCover({ features, genreLineage: lineage, intentText, metaphorWords, declaredEmotionId, lockedTechnique, contextFallback }) {
-  const kinetics = buildKinetics(features, lineage, intentText, declaredEmotionId)
-  // Audio-only register: context for the metaphor stage. Logged once, below,
-  // for the final read.
-  const audioRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, undefined, true)
-
-  const meta = await generateVisualMetaphors({
-    generate: geminiRawText,
-    userFeeling: metaphorWords,
-    context: audioRegister || contextFallback,
-    kinetics,
-  })
-
-  const technique = lockedTechnique || resolveTechnique(features, lineage, intentText, declaredEmotionId, meta.feeling)
-  // The register the scene writer sees also carries what the words are about.
-  const emotionalRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, meta.feeling)
-  const sceneMode = resolveSubjectMode(deriveSceneMode(features), meta.hasPerson)
-
-  return { technique, metaphor: meta.metaphor, hasPerson: meta.hasPerson, feeling: meta.feeling, emotionalRegister, sceneMode }
 }
 
 function parseSceneResponse(rawText, fallbackScene) {
@@ -542,7 +198,7 @@ const audioFeaturesToVisualDescription = (features, artistGenre = null) => {
   // No "mood" line here on purpose: `features.mood` is a crude nearest-cluster
   // label computed client-side (WorkspaceWizard.tsx's VECTOR_CLUSTERS), a
   // completely separate classifier from the archetype-based EMOTIONAL REGISTER
-  // block (buildEmotionalRegister -> readEmotion) that always accompanies this
+  // block (planCover -> buildEmotionalRegister) that always accompanies this
   // text in the same prompt. Shipping both risked two disagreeing mood reads
   // in one prompt — the LLM doesn't reconcile contradictions, it blends them.
 
