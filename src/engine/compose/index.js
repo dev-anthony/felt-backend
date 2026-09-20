@@ -24,7 +24,7 @@
  *   [MEDIUM] → [SCENE] → [RENDERING] → [TECHNIQUE] → [SUBJECT GUARD + FORMAT]
  */
 
-const { getSuffix } = require('../technique')
+const { getSuffix, TECHNIQUES } = require('../technique')
 const { mediumFamily } = require('../assembler/promptAssembler')
 
 // Layers that carry a technique's visual identity. Order is reading order.
@@ -92,10 +92,13 @@ function composeImagePrompt({ scene, dna, technique, noPeople = false, budget = 
   const medium = clean(frag('artMedium'))
 
   // Ordered [layerKey, text] pairs so budget dropping can address them by key.
+  // A technique may name layers whose DNA pick contradicts its own capture
+  // (INFRARED_THERMAL: a conventional lens and a razor-sharp digital stock).
+  const omit = new Set((TECHNIQUES[technique] && TECHNIQUES[technique].composeOmit) || [])
   const layers = [
     ...(photographic ? CAPTURE_LAYERS : []),
     ...LOOK_LAYERS,
-  ].map((key) => [key, frag(key)]).filter(([, text]) => text)
+  ].filter((key) => !omit.has(key)).map((key) => [key, frag(key)]).filter(([, text]) => text)
 
   const build = () => {
     const rendering = layers.map(([, text]) => text)

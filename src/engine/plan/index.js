@@ -56,7 +56,7 @@ function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId
 }
 
 /** Builds the labeled register block for a track + the artist's own words. */
-function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId, quiet = false) {
+function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId, { wordsArchetypeId, quiet = false, mode = 'full' } = {}) {
   try {
     const vector = buildFeatureVector(features)
     const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId)
@@ -67,7 +67,7 @@ function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmo
     } else {
       console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}` + (read.declaredEmotion ? ` | artist declared "${read.declaredEmotion.label}"` : '') + (read.wordsReading ? ` | words read as "${read.wordsReading.label}"` : ''))
     }
-    return emotionalRegisterBlock(read, read.correctedVector)
+    return emotionalRegisterBlock(read, read.correctedVector, { mode })
   } catch (err) {
     console.warn(`[EMOTION] read failed, continuing without register: ${err?.message || err}`)
     return ''
@@ -200,7 +200,9 @@ async function planCover({ generate, features, genreLineage: lineage, intentText
   const kinetics = buildKinetics(features, lineage, intentText, declaredEmotionId)
   // Audio-only register: context for the metaphor stage. Logged once, below,
   // for the final read.
-  const audioRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, undefined, true)
+  // Audio FACTS only (mode 'metaphor'): the metaphor stage is asked what the
+  // artist's WORDS are about, and must not be told the audio's archetype first.
+  const audioRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, { quiet: true, mode: 'metaphor' })
 
   const meta = await generateVisualMetaphors({
     generate,
@@ -212,7 +214,13 @@ async function planCover({ generate, features, genreLineage: lineage, intentText
 
   const technique = lockedTechnique || resolveTechnique(features, lineage, intentText, declaredEmotionId, meta.feeling)
   // The register the scene writer sees also carries what the words are about.
-  const emotionalRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, meta.feeling)
+  // With a metaphor in hand, the scene writer gets the register WITHOUT the
+  // matrix's fixed scenery/movement lines (mode 'scene'); without one (model
+  // failed) it still needs the full register as its only brief.
+  const emotionalRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, {
+    wordsArchetypeId: meta.feeling,
+    mode: meta.metaphor ? 'scene' : 'full',
+  })
   const sceneMode = resolveSubjectMode(deriveSceneMode(features), meta.hasPerson)
 
   return { technique, metaphor: meta.metaphor, hasPerson: meta.hasPerson, feeling: meta.feeling, emotionalRegister, sceneMode }

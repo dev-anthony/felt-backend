@@ -208,6 +208,12 @@ MONUMENTAL_SCALE_ISOLATION: {
     graphic: ['graphic_clean_photo'],
     // Thermal imaging is a PHOTOGRAPHIC technique — illustration mediums directly contradict it
     graphicForbidden: ['graphic_collage', 'graphic_riso_print', 'graphic_vinyl_sleeve', 'graphic_panel_grid'],
+    // The camera layer already says "captured on a thermal-imaging sensor rather
+    // than a conventional lens". The affinity table also names a 35mm lens and
+    // "clean digital medium-format capture with fine un-airbrushed detail" — a
+    // conventional optic and a razor-sharp digital look, both contradicting a
+    // low-resolution heat image. The composer leaves these two layers out.
+    composeOmit: ['lens', 'filmStock'],
     purpose: 'See via a non-visible spectrum — heat or infrared — so the image reads as surveilled, othered, or inhuman rather than simply dark.',
     axes: { movement: 2, energy: 4, intimacy: 1, grandeur: 3, luxury: 1, isolation: 6, chaos: 4, stillness: 6 },
     bestFor: ['paranoia, surveillance, being watched', 'dehumanization, threat, the uncanny', 'cold, clinical dread'],

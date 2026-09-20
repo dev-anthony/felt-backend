@@ -334,7 +334,27 @@ function readEmotion(vector, declaredGenre, intentText, declaredEmotionId, words
  * The labeled EMOTIONAL REGISTER block handed to the scene writer.
  * Its own clearly-flagged input — not buried among technical metrics.
  */
-function emotionalRegisterBlock(read, vector) {
+/**
+ * @param {object} read result of readEmotion
+ * @param {object} vector the corrected vector
+ * @param {object} [opts]
+ * @param {'full'|'scene'|'metaphor'} [opts.mode]
+ *   full     everything (default; the fallback when no metaphor exists)
+ *   scene    for the scene writer once a metaphor exists: drops the MOVEMENT and
+ *            VISUAL DIRECTION lines. The direction is a fixed sentence per
+ *            archetype x state x intensity cell that names concrete scenery —
+ *            for Tension/Normal/High it is "long-exposure headlights streak red
+ *            across a night intersection" — so EVERY track in that cell got
+ *            traffic and intersections whatever the artist wrote. The rendering
+ *            system already reads the same cell through the DNA bias, so
+ *            nothing is lost by not also injecting its scenery as text.
+ *   metaphor for the metaphor stage: audio FACTS only. No archetype, register,
+ *            movement or direction — the metaphor stage is asked what the
+ *            artist's WORDS are about, and telling it "ARCHETYPE: Tension"
+ *            first anchors its answer to the audio's label.
+ */
+function emotionalRegisterBlock(read, vector, opts = {}) {
+  const mode = opts.mode || 'full'
   const m = vector.meta
   const kineticLine =
     read.kinetic >= 0.65
@@ -343,13 +363,14 @@ function emotionalRegisterBlock(read, vector) {
         ? `MOVEMENT: MODERATE — the subject is doing something active, caught between two moments rather than posing.`
         : `MOVEMENT: LOW — stillness is correct here; let quiet hold the frame.`
 
+  const withArchetype = mode !== 'metaphor'
   return [
-    `EMOTIONAL REGISTER: ${read.archetype.register}`,
-    `ARCHETYPE: ${read.archetype.label}${read.secondary ? ` (with an undercurrent of ${read.secondary.label})` : ''}`,
+    withArchetype ? `EMOTIONAL REGISTER: ${read.archetype.register}` : '',
+    withArchetype ? `ARCHETYPE: ${read.archetype.label}${read.secondary ? ` (with an undercurrent of ${read.secondary.label})` : ''}` : '',
     `AESTHETIC WORLD: ${read.stateLabel} — ${read.stateDirective}`,
     `INTENSITY: ${read.intensityLabel} — ${read.intensityDirective}`,
-    kineticLine,
-    `VISUAL DIRECTION FOR THIS COMBINATION: ${read.visualDirection}`,
+    mode === 'full' ? kineticLine : '',
+    mode === 'full' ? `VISUAL DIRECTION FOR THIS COMBINATION: ${read.visualDirection}` : '',
     // The artist's own word for the track. It reaches the scene writer even when
     // it did not move the archetype — on a strongly-read track the audio rightly
     // wins the register, but the feeling the artist named should still be
@@ -357,7 +378,7 @@ function emotionalRegisterBlock(read, vector) {
     // heartbreak" stays about heartbreak.
     read.declaredEmotion
       ? `THE ARTIST CALLS THIS: "${read.declaredEmotion.label}" — ${read.declaredEmotion.definition}` +
-        (read.declaredEmotion.archetype !== read.archetypeId
+        (mode !== 'metaphor' && read.declaredEmotion.archetype !== read.archetypeId
           ? ' The audio reads differently, and BOTH are true: build a scene where this'
             + ' feeling is what the person in it is actually experiencing, inside the world the'
             + ' audio describes. Do not resolve the contradiction — it is the point.'
@@ -366,12 +387,12 @@ function emotionalRegisterBlock(read, vector) {
     // The artist's WORDS read as a different feeling than the audio measures.
     // Same principle as the declared-emotion line above: both are true, the
     // contradiction is the point. The words decide what the cover is ABOUT; the
-    // audio decides the physical pressure and world it happens in.
-    read.wordsReading
+    // audio decides the physical pressure and world it plays out in.
+    mode !== 'metaphor' && read.wordsReading
       ? `WHAT THE ARTIST'S WORDS ARE ABOUT: "${read.wordsReading.label}" — ${read.wordsReading.register}. The audio measures differently (${read.archetype.label}), and BOTH are true: let the words decide what is at stake in the image, and the audio decide the physical pressure and world it plays out in. Do not resolve the contradiction — it is the point.`
       : '',
     `DERIVED FROM: ${m.genre ? m.genre + ', ' : ''}${Math.round((vector.tempo * 120) + 60)} BPM, energy ${Math.round(vector.energy * 100)}/100, valence ${Math.round(vector.valence * 100)}/100, danceability ${Math.round(vector.danceability * 100)}/100, ${m.key} ${m.scale}`,
-  ].join('\n')
+  ].filter(Boolean).join('\n')
 }
 
 /**

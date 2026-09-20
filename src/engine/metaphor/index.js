@@ -121,10 +121,10 @@ function buildMetaphorPrompt({ userFeeling, context, kinetics }) {
   return `You are a visual metaphor generator for album cover art. Your ONLY job: turn an emotional truth into ONE physical image — not a photograph yet, not a staged scene, just the IMAGE that could only mean this.
 
 ARTIST'S OWN WORDS (the primary source — read this first): "${userFeeling}"
-${context ? `\nADDITIONAL CONTEXT (secondary — use only to refine, never to override the words above):\n${context}\n` : ''}${buildKineticBlock(kinetics)}
+${context ? `\nMEASURED FROM THE AUDIO (facts about the track — secondary, never overrides the words above):\n${context}\n` : ''}${buildKineticBlock(kinetics)}
 STEP 1 — NAME THE FEELING. Which ONE of these twelve is the artist's WORDS mainly about?
 ${feelingMenu()}
-Judge the emotional SUBJECT of what they wrote — what is at stake for them — not how the music sounds and not the genre. A tense, fast, aggressive beat under a sentence about missing someone is still about missing someone. Answer with the id exactly as written above.
+Judge the emotional SUBJECT of what they wrote — what is at stake for them. Any context above was MEASURED FROM THE AUDIO and can contradict the words; it must not decide this answer, and neither does the genre. A tense, fast, aggressive beat under a sentence about missing someone is still about missing someone. Answer with the id exactly as written above.
 
 STEP 2 — Generate 4 distinct visual metaphors: specific, nameable physical objects, materials, places or situations that embody that emotional truth WITHOUT illustrating the artist's words literally.
 
