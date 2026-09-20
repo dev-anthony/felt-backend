@@ -972,4 +972,6 @@ module.exports = router;
 // Exported for tests: the scene prompt is now conditional, so its branching is
 // worth asserting directly rather than only observing through a live Gemini call.
 module.exports.aestheticSystemPrompt = aestheticSystemPrompt
+module.exports.synthesizeSceneBrief = synthesizeSceneBrief
+module.exports.generateSafeScene = generateSafeScene
 module.exports.deriveSceneMode = deriveSceneMode
