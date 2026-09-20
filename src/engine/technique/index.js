@@ -555,6 +555,15 @@ const TECHNIQUE_EMOTION_AFFINITY = {
 
 
 
+// How far the artist's own words can pull technique choice away from the audio
+// read. Bounded on purpose, for the same reason EMOTION_PULL is bounded in the
+// emotion layer: the audio is real evidence and a misread sentence must stay
+// recoverable — but at 0 the artist was never heard at all. A track that MEASURES
+// as Tension while the artist says "don't go, hold on to what I love" is
+// Tenderness-under-threat; audio alone chose INFRARED_THERMAL (surveillance,
+// dread, tenderness affinity 0.05) for it every single time.
+const WORDS_TECHNIQUE_WEIGHT = 0.40
+
 /**
  * Mathematically select a technique from the track's emotion read — NOT from
  * raw audio, per the architecture agreed earlier (emotion is the interpreter).
@@ -565,14 +574,24 @@ const TECHNIQUE_EMOTION_AFFINITY = {
  * @param {object} [opts]
  * @param {'low'|'medium'|'high'|'extreme'} [opts.intensity]
  * @param {number} [opts.explore] probability of picking a near-tie runner-up (default 0.30)
+ * @param {string} [opts.secondaryArchetypeId] a SECOND reading of the track's
+ *   feeling — what the artist's own words are about, when that differs from what
+ *   the audio measures. Affinity is interpolated between the two readings
+ *   (WORDS_TECHNIQUE_WEIGHT toward the words), so the winner is a technique that
+ *   suits BOTH rather than the audio's favourite ignoring the artist entirely.
  * @returns {string} technique name
  */
 function selectTechnique(archetypeId, vector, opts = {}) {
-  const { intensity = 'medium', explore = 0.30 } = opts
+  const { intensity = 'medium', explore = 0.30, secondaryArchetypeId } = opts
   const intensityWeight = { low: 0.2, medium: 0.45, high: 0.75, extreme: 1 }[intensity] ?? 0.45
+  const useSecondary = !!secondaryArchetypeId && secondaryArchetypeId !== archetypeId
 
   const scored = Object.entries(TECHNIQUES).map(([name, t]) => {
-    const affinity = (TECHNIQUE_EMOTION_AFFINITY[name] || {})[archetypeId] ?? 0.4
+    const row = TECHNIQUE_EMOTION_AFFINITY[name] || {}
+    const primaryAffinity = row[archetypeId] ?? 0.4
+    const affinity = useSecondary
+      ? primaryAffinity * (1 - WORDS_TECHNIQUE_WEIGHT) + (row[secondaryArchetypeId] ?? 0.4) * WORDS_TECHNIQUE_WEIGHT
+      : primaryAffinity
     const movementAxis = (t.axes?.movement ?? 5) / 10
     const movementAgreement = 1 - Math.abs(movementAxis - (vector.motion ?? 0.5))
     const chaosAxis = (t.axes?.chaos ?? 5) / 10
@@ -692,6 +711,7 @@ module.exports = {
   techniqueHidesFace,
   applyTechniqueBias,
   selectTechnique,
+  WORDS_TECHNIQUE_WEIGHT,
   getFallbackTechnique,
 }
 

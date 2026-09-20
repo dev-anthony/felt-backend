@@ -234,7 +234,16 @@ function applyDeclaredEmotion(vector, emotion) {
   return { vector: v, applied }
 }
 
-function readEmotion(vector, declaredGenre, intentText, declaredEmotionId) {
+/**
+ * @param {string} [wordsArchetypeId] what the artist's WORDS are about, as read
+ *   by the metaphor stage (one of the 12 archetype ids). This is a second,
+ *   independent reading of the track — NOT an override. It never moves the
+ *   audio vector or the archetype the audio chose; it is carried alongside so
+ *   technique selection and the scene writer can honour both truths (an
+ *   anxious, high-energy record whose lyrics are about not losing someone).
+ *   Ignored when unknown, or when it is the reading already chosen.
+ */
+function readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId) {
   const cues = readSemanticCues(intentText)
   const corrected = applySemanticCorrection(vector, cues)
   vector = corrected.vector
@@ -269,6 +278,20 @@ function readEmotion(vector, declaredGenre, intentText, declaredEmotionId) {
   const state = routeAestheticState(vector)
   const intensity = scaleIntensity(vector)
 
+  // The artist's words as their own reading, only when it adds information: a
+  // known archetype that differs from the one already chosen and is not simply
+  // the archetype the artist explicitly picked from the taxonomy.
+  let wordsReading = null
+  if (
+    wordsArchetypeId &&
+    ARCHETYPES[wordsArchetypeId] &&
+    wordsArchetypeId !== primary.id &&
+    !(emotion && emotion.archetype === wordsArchetypeId)
+  ) {
+    const wa = ARCHETYPES[wordsArchetypeId]
+    wordsReading = { id: wordsArchetypeId, label: wa.label, register: wa.register }
+  }
+
   const a = primary.archetype
   const stateInfo = AESTHETIC_STATES[state.id]
   const tierInfo = INTENSITY_TIERS[intensity.id]
@@ -301,6 +324,7 @@ function readEmotion(vector, declaredGenre, intentText, declaredEmotionId) {
     declaredEmotion: emotion
       ? { id: emotion.id, label: emotion.label, definition: emotion.definition, archetype: emotion.archetype }
       : null,
+    wordsReading,
     archetypeId: primary.id,
     correctedVector: vector,
   }
@@ -338,6 +362,13 @@ function emotionalRegisterBlock(read, vector) {
             + ' feeling is what the person in it is actually experiencing, inside the world the'
             + ' audio describes. Do not resolve the contradiction — it is the point.'
           : '')
+      : '',
+    // The artist's WORDS read as a different feeling than the audio measures.
+    // Same principle as the declared-emotion line above: both are true, the
+    // contradiction is the point. The words decide what the cover is ABOUT; the
+    // audio decides the physical pressure and world it happens in.
+    read.wordsReading
+      ? `WHAT THE ARTIST'S WORDS ARE ABOUT: "${read.wordsReading.label}" — ${read.wordsReading.register}. The audio measures differently (${read.archetype.label}), and BOTH are true: let the words decide what is at stake in the image, and the audio decide the physical pressure and world it plays out in. Do not resolve the contradiction — it is the point.`
       : '',
     `DERIVED FROM: ${m.genre ? m.genre + ', ' : ''}${Math.round((vector.tempo * 120) + 60)} BPM, energy ${Math.round(vector.energy * 100)}/100, valence ${Math.round(vector.valence * 100)}/100, danceability ${Math.round(vector.danceability * 100)}/100, ${m.key} ${m.scale}`,
   ].join('\n')

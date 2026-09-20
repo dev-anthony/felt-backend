@@ -179,7 +179,7 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
       const inFamily = candidates.filter((c) => conceptMediumFamily(c) === effectiveMediumFamily)
       if (inFamily.length > 0) {
         if (techniqueRequiresPhoto && opts.mediumFamily && opts.mediumFamily !== 'photo') {
-          console.log(`[DNA-TECHNIQUE] ${technique} requires photo medium, overriding pre-technique guess of '${opts.mediumFamily}'`)
+          if (!opts.quiet) console.log(`[DNA-TECHNIQUE] ${technique} requires photo medium, overriding pre-technique guess of '${opts.mediumFamily}'`)
         }
         candidates = inFamily
       }
@@ -218,7 +218,7 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
       if (t && t.graphicForbidden && t.graphicForbidden.length > 0) {
         const compatible = candidates.filter((c) => !t.graphicForbidden.includes(c.id))
         if (compatible.length > 0) {
-          console.log(`[DNA-TECHNIQUE] ${technique} forbids [${t.graphicForbidden.join(', ')}], filtered to ${compatible.length} candidates`)
+          if (!opts.quiet) console.log(`[DNA-TECHNIQUE] ${technique} forbids [${t.graphicForbidden.join(', ')}], filtered to ${compatible.length} candidates`)
           candidates = compatible
         }
       }
@@ -282,7 +282,7 @@ function computeVisualDNA(rawFeatures, techniqueName, opts = {}) {
 
     // Log the selection so we can audit what's actually being chosen
     if (layer.key === 'graphic' || layer.key === 'lighting' || layer.key === 'color') {
-      console.log(`[DNA-SELECT] ${layer.key}: ${chosen.conceptId} → "${chosen.fragment.substring(0, 70)}..."`)
+      if (!opts.quiet) console.log(`[DNA-SELECT] ${layer.key}: ${chosen.conceptId} → "${chosen.fragment.substring(0, 70)}..."`)
     }
 
     // STATE-AWARE STAGING.

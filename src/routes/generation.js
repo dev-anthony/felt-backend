@@ -46,15 +46,26 @@ const { generateVisualMetaphors } = require('../engine/metaphor')
  * own movement/chaos signal. Gemini's job is only to write the scene for
  * whichever technique this returns — it never sees a menu.
  */
-function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId) {
+function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId) {
   try {
     const vector = buildFeatureVector(features)
     // read.archetypeId ('MELANCHOLY' etc.) and read.intensity ('low'|'medium'
     // |'high'|'extreme') are both plain strings directly on the return object
     // — confirmed against engine/emotion/index.js.
-    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
-    const technique = selectTechnique(read.archetypeId, read.correctedVector, { intensity: read.intensity })
-    console.log(`[TECHNIQUE SELECT] archetype=${read.archetypeId} intensity=${read.intensity} kinetic=${read.kinetic} -> ${technique}`)
+    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId)
+    // A SECOND reading of the feeling when there is one: the artist's explicit
+    // pick from the taxonomy, else what their words are about (read by the
+    // metaphor stage). Audio alone chose INFRARED_THERMAL — a technique whose
+    // own definition says "poor for warmth or tenderness" — for a track whose
+    // words were about holding on to someone loved, every time, because the
+    // audio measured Tension. selectTechnique blends the two readings.
+    const secondary = [read.declaredEmotion?.archetype, read.wordsReading?.id]
+      .find((a) => a && a !== read.archetypeId)
+    const technique = selectTechnique(read.archetypeId, read.correctedVector, {
+      intensity: read.intensity,
+      secondaryArchetypeId: secondary,
+    })
+    console.log(`[TECHNIQUE SELECT] audio=${read.archetypeId} secondary=${secondary || '-'} intensity=${read.intensity} kinetic=${read.kinetic} -> ${technique}`)
     return technique
   } catch (err) {
     console.warn(`[TECHNIQUE SELECT] scoring failed, using fallback: ${err?.message || err}`)
@@ -63,14 +74,16 @@ function resolveTechnique(features, declaredGenre, intentText, declaredEmotionId
 }
 
 /** Builds the labeled register block for a track + the artist's own words. */
-function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId) {
+function buildEmotionalRegister(features, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId, quiet = false) {
   try {
     const vector = buildFeatureVector(features)
-    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId)
-    if (read.semanticCorrections.length) {
+    const read = readEmotion(vector, declaredGenre, intentText, declaredEmotionId, wordsArchetypeId)
+    if (quiet) {
+      // caller logs once, for the final read
+    } else if (read.semanticCorrections.length) {
       console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic} | corrections: ${read.semanticCorrections.join('; ')}`)
     } else {
-      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}` + (read.declaredEmotion ? ` | artist declared "${read.declaredEmotion.label}"` : ''))
+      console.log(`[EMOTION] ${read.archetype.label} | ${read.stateLabel} | ${read.intensityLabel} | kinetic=${read.kinetic}` + (read.declaredEmotion ? ` | artist declared "${read.declaredEmotion.label}"` : '') + (read.wordsReading ? ` | words read as "${read.wordsReading.label}"` : ''))
     }
     return emotionalRegisterBlock(read, read.correctedVector)
   } catch (err) {
@@ -225,7 +238,7 @@ RELEVANCE MANDATE (READ THIS FIRST — this is the entire job):
 - Pick ONE concrete anchor: a specific person doing a specific thing, a specific place, or a single loaded object — derived from the artist's words, not assembled from this brief's example lists.
 
 An EMOTIONAL REGISTER block is supplied with every brief. It is derived from the track's measured tempo, energy, groove, brightness and key, cross-referenced against a twelve-archetype model of how music actually makes people feel. Read it to understand the register, the aesthetic world, the intensity tier, the MOVEMENT line, and the VISUAL DIRECTION — this informs HOW you execute the scene, not WHAT the scene is.
-- VISUAL DIRECTION names the lighting, palette, composition and texture this combination calls for. Use it as a rendering guide.
+- VISUAL DIRECTION describes the mood, world and materials this combination calls for. Let it steer WHAT KIND OF PLACE, weather, time of day and physical state you stage — but never write lighting, palette, composition or texture words yourself: the rendering system reads the same direction separately and applies it.
 - If VISUAL DIRECTION describes an object, material or abstraction rather than a person, follow it — but only if it doesn't contradict the artist's actual words.
 
 ${metaphor ? `
@@ -234,12 +247,16 @@ ${metaphor}
 This is the physical image that embodies the artist's emotional truth. Build the entire scene around this image. It is the subject of the cover, not decoration inside it — do not replace it with a literal illustration of the artist's words or a generic scene for this genre. If a person appears, they are staged interacting with this image, not standing next to a version of it that could be swapped out. If the metaphor describes an object or material with no person in it, that is correct — do not add a figure just to have one.
 ` : ''}
 
-LOCKED TECHNIQUE (RENDERING VOCABULARY ONLY — do NOT let this change what the scene IS):
+LOCKED TECHNIQUE (already chosen mathematically — do NOT choose another, do NOT name it, do NOT output a TECHNIQUE line):
 - ${techniqueName} — ${t.purpose}
-- Visual signature: ${t.visualSignature}
-- Best for: ${t.bestFor.join('; ')}
+- Typical subjects (illustrations of a style, never a menu): ${t.bestFor.join('; ')}
 - Common mistake to avoid: ${t.commonMistakes}
-- This technique describes HOW to render the scene artistically, not WHAT scene to write. Use its vocabulary for sensory detail (lighting model, texture, color palette, mood intensity) but do NOT let it override the concrete scene the artist's words demand. Example: "infrared thermal" gives you heat-signature vocabulary (orange, blue, thermal blooms), but it cannot change "a person holding onto a departing bus" into "an abstract heat signature". The person holding the bus is the scene. The thermal imagery is how you describe that scene.
+- THE TECHNIQUE IS APPLIED BY A SEPARATE RENDERING SYSTEM AFTER YOU. Your only job is to stage a scene that a photographer using this method would naturally choose to shoot: the place, the subject, the moment. Never describe the look itself — no thermal, infrared or false-colour words, no exposure, blur, grain, film or lens words, no colour palette, no "rendered in". If you describe the look, the image ends up carrying two competing versions of it and the model follows the wrong one. The artist's words decide WHAT the scene is; the technique never changes that.
+
+REAL, NOT RENDERED (this is why generated covers read as AI — enforced, and a scene that breaks it is rejected and rewritten):
+- Describe only what physically exists and what it is physically doing: material, wear, weight, load, weather, what is moving or about to give. Never add effects — no glow or luminous light, no networks, webs or veins of cracks, no floating particles, no energy, aura or magic. A photographer can only photograph what is there.
+- Tension comes from the thing's real behaviour (a cable at the exact load before it parts, a joint carrying more than it was built for), never from a symbol drawn on top of it.
+- ONE dominant subject that would still read as a single clear shape at thumbnail size, with space around it — not a busy scene of many equal elements.
 
 DEPICTING CONNECTION, CHEMISTRY & DESIRE — ONLY IF THE SONG IS LITERALLY ABOUT THIS:
 Apply this section ONLY when the song's actual subject is attraction, wanting someone, dancing with someone, or romantic/sexual chemistry. If the song is about something else — holding on to something slipping away, loss, resistance, ambition, grief, solitude, anger, defiance — IGNORE THIS SECTION ENTIRELY. A fast tempo or high energy reading is NOT the same thing as a song being about connection; do not reach for a club, a crowd, a dancefloor or generic "nightlife energy" imagery just because a track is fast or loud.
@@ -315,7 +332,7 @@ function deriveSceneMode(features) {
     const mediums = {}
     const subjects = {}
     for (const t of Object.keys(engine.technique.TECHNIQUES)) {
-      const dna = engine.computeVisualDNA(features, t)
+      const dna = engine.computeVisualDNA(features, t, { quiet: true })
       const fam = engine.mediumFamily(dna)
       mediums[fam] = (mediums[fam] || 0) + 1
       const sub = dna.selections.subject.conceptId === 'subj_absent' ? 'absent' : 'person'
@@ -369,99 +386,15 @@ function buildFluxPrompt(technique, scene) {
 }
 
 /**
- * IMAGE MODEL SIMPLIFICATION LAYER.
- *
- * The assembled aesthetic prompt is ~2000 chars written for a REASONING model.
- * Image models (Cloudflare Leonardo/Lucid, FLUX, Sana, and whatever we swap in
- * next) behave differently: attention is finite and front-loaded, so every
- * sentence that is not the picture competes with the picture. Layout and
- * typography instructions are the worst offenders — "a vertical column of quiet
- * space along one edge for stacked typography" makes a diffusion model render
- * dead bands or literal text, and it buys nothing a 1:1 canvas doesn't give.
- *
- * This used to regex-guess which sentences were "the narrative", which failed
- * badly: its place-word heuristic matched on "edge"/"frame", so on a real
- * generation it grabbed the composition and format boilerplate as narrative,
- * dropped the scene's second sentence, and — critically — dropped the infrared
- * LIGHTING and COLOR fragments entirely. The thermal rendering instructions
- * never reached the model, which is exactly why technique fidelity kept
- * scoring ~3/10 while the metaphor scored ~9/10.
- *
- * So it no longer parses prose at all. We already KNOW every part, because we
- * assembled them: the scene text is passed in, and `dna.selections` holds each
- * chosen fragment keyed by layer. We compose deterministically:
- *
- *   [MEDIUM] → [SCENE] → [RENDERING: camera/lighting/color/texture] →
- *   [TECHNIQUE SUFFIX] → [FORMAT + short negatives]
- *
- * Rendering fragments are what carry a technique's visual identity, so they are
- * never dropped. Layout/typography/editorial framing are dropped. The long
- * anti-AI-tell negative list is compressed — useful, but not worth 400 chars of
- * a front-loaded attention budget.
- *
- * @param {object} args
- * @param {string} args.scene the complete scene text (never truncated)
- * @param {object} [args.dna] the Visual DNA whose `.selections` hold the fragments
- * @param {string} args.technique technique key, for the one-line suffix
- * @param {string} [args.fallbackPrompt] used only if no dna is available
- * @returns {string} an image-model-friendly prompt
+ * Composes the prompt that is actually sent to the image model (see
+ * engine/compose for the rationale) and logs every part, so a bad image can be
+ * traced to the stage that produced it instead of guessed at. Returns the string.
  */
-function simplifyForImageModel({ scene, dna, technique, fallbackPrompt, noPeople = false }) {
-  const frag = (key) => {
-    const s = dna && dna.selections && dna.selections[key]
-    return s && s.fragment ? s.fragment.trim().replace(/\.$/, '') : ''
-  }
-
-  // No DNA (legacy/failed-engine path) — send the scene plus the technique
-  // suffix rather than the 2000-char reasoning prompt.
-  if (!dna || !dna.selections) {
-    const legacy = [
-      (scene || fallbackPrompt || '').trim(),
-      TECHNIQUE_SUFFIXES[technique] || '',
-      'A 1:1 square album cover. No text, letters, watermarks or logos.',
-    ].filter(Boolean).join(' ')
-    console.log('[SIMPLIFY] no DNA available — legacy scene+suffix path')
-    console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:')
-    console.log(legacy)
-    return legacy
-  }
-
-  const medium = frag('artMedium')
-
-  // The technique's visual identity lives here. Never dropped.
-  const rendering = [frag('camera'), frag('lens'), frag('lighting'), frag('color'), frag('texture')]
-    .filter(Boolean)
-    .join(', ')
-
-  const suffix = TECHNIQUE_SUFFIXES[technique] || ''
-
-  const parts = [
-    medium ? `${medium}.` : '',
-    (scene || '').trim().replace(/\.+$/, '.'),
-    rendering ? `${rendering}.` : '',
-    suffix,
-    // The full reality tail is dropped above, but its subject-count guard is a
-    // real safety property (unwanted second person / crowd), so it is kept in
-    // short form rather than lost with the rest of the negatives.
-    noPeople
-      ? 'No people at all in frame — no person, figure, silhouette or hands.'
-      : 'Exactly one person in frame, no second person, no crowd.',
-    'A 1:1 square album cover, edge to edge. No text, letters, watermarks or logos. No waxy plastic skin, no malformed hands, no over-smoothed CGI.',
-  ].filter(Boolean)
-
-  const simplified = parts.join(' ').replace(/\s+/g, ' ').trim()
-
-  console.log('[SIMPLIFY] composed from DNA (no prose parsing)')
-  console.log('[SIMPLIFY] medium:', medium || '(none)')
-  console.log('[SIMPLIFY] scene chars:', (scene || '').length, '(complete)')
-  console.log('[SIMPLIFY] rendering fragments kept:', rendering ? rendering.length : 0, 'chars')
-  console.log('[SIMPLIFY] dropped: composition, typography, editorial, graphic-layout, long negatives')
-  console.log('[SIMPLIFY] final length:', simplified.length, 'chars')
-  console.log('[SIMPLIFY] STRUCTURE: [MEDIUM] → [SCENE] → [RENDERING] → [TECHNIQUE] → [FORMAT]')
-  console.log('[SIMPLIFY] FULL SIMPLIFIED PROMPT:')
-  console.log(simplified)
-
-  return simplified
+function composeForImage({ scene, dna, technique, noPeople, label = 'COMPOSE' }) {
+  const { prompt, parts, length } = engine.composeImagePrompt({ scene, dna, technique, noPeople })
+  console.log(`[${label}] technique=${technique} noPeople=${!!noPeople} medium="${parts.medium || '-'}" scene=${parts.scene.length}c rendering=${parts.rendering.length} layers dropped=[${parts.dropped.join(',') || '-'}] total=${length}c`)
+  console.log(`[${label}] PROMPT SENT TO IMAGE MODEL:\n${prompt}`)
+  return prompt
 }
 
 async function buildFinalPrompt(technique, scene, features, { useCompiler = false, userFeeling, mood, noPeople = false, mediumFamily } = {}) {
@@ -506,6 +439,34 @@ async function generateSafeScene(promptText, options) {
     if (sceneFailsSafetyCheck(scene)) {
       console.warn('[SAFETY] Rejected scene brief on second pass — falling back to hardcoded safe scene')
       scene = SAFE_FALLBACK_SCENE
+    }
+  }
+
+  // QUALITY GUARD. Decoration ("glowing fissures", "a spiderweb of cracks") and
+  // technique vocabulary written into the story ("rendered in thermal
+  // false-color") both survived the prompt rules in real generations, and both
+  // reach the image model literally. One retry, naming the exact words. Skipped
+  // for the two fallbacks — those are the artist's own words or a fixed safe
+  // scene, not model output to police.
+  const isFallback = scene === SAFE_FALLBACK_SCENE || scene === (options && options.fallbackScene)
+  if (!isFallback) {
+    const issues = engine.sceneQualityIssues(scene)
+    if (issues.length) {
+      console.warn(`[SCENE QUALITY] first pass rejected: ${issues.map((i) => `${i.kind}:"${i.match}"`).join(', ')} — retrying once`)
+      try {
+        const retry = await generateWithRetry(`${promptText}\n\n${engine.qualityRetryNote(issues)}`, { ...options })
+        const retryIssues = engine.sceneQualityIssues(retry.scene)
+        if (!sceneFailsSafetyCheck(retry.scene) && retryIssues.length < issues.length) {
+          console.log(`[SCENE QUALITY] retry accepted (${issues.length} -> ${retryIssues.length} issues)`)
+          scene = retry.scene
+        } else {
+          console.warn('[SCENE QUALITY] retry no better — keeping first pass')
+        }
+      } catch (err) {
+        console.warn(`[SCENE QUALITY] retry failed, keeping first pass: ${err?.message || err}`)
+      }
+    } else {
+      console.log('[SCENE QUALITY] clean')
     }
   }
 
@@ -1283,4 +1244,3 @@ module.exports = router;
 // worth asserting directly rather than only observing through a live Gemini call.
 module.exports.aestheticSystemPrompt = aestheticSystemPrompt
 module.exports.deriveSceneMode = deriveSceneMode
-module.exports.simplifyForImageModel = simplifyForImageModel

@@ -18,6 +18,8 @@ const { computeVisualDNA, orderedFragments, LAYERS } = require('./dna')
 const { assemblePrompt, mediumFamily } = require('./assembler/promptAssembler')
 const { compileScene } = require('./compiler/geminiCompiler')
 const technique = require('./technique')
+const { composeImagePrompt } = require('./compose')
+const { sceneQualityIssues, qualityRetryNote } = require('./scene/quality')
 const vocabulary = require('./vocabulary')
 
 /**
@@ -91,6 +93,9 @@ module.exports = {
   // high-level
   computeVisualDNA,
   assembleFromScene,
+  composeImagePrompt,
+  sceneQualityIssues,
+  qualityRetryNote,
   orchestrate,
   // sub-systems (for advanced callers / tests)
   assemblePrompt,
