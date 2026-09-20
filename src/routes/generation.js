@@ -371,6 +371,54 @@ function resolveSubjectMode(sceneMode, hasPerson) {
   return sceneMode
 }
 
+/**
+ * The shared front half of every route that writes a scene: read the audio,
+ * ask the metaphor stage what the artist's WORDS are about and for the image
+ * that carries it, choose the technique from BOTH readings, then hand back
+ * everything the scene writer needs.
+ *
+ * This sequence used to be copy-pasted into five call sites (synthesizeSceneBrief,
+ * /expand, both /transcribe branches, /refine), and every fix had to be
+ * re-applied five times — which is how the technique/words fix, the kinetic
+ * block and the subject-mode override each landed in some places and not
+ * others. One function means one place.
+ *
+ * Order matters: the metaphor call comes BEFORE technique selection, because
+ * it is the only stage that reads the artist's words as language, and the
+ * technique now depends on what it finds. It is one Gemini call either way.
+ * If that call fails (quota, outage), `feeling` is null and technique falls
+ * back to the audio read alone — exactly the previous behaviour.
+ *
+ * @param {object} args
+ * @param {object} args.features audio features for the upload
+ * @param {string|null} args.genreLineage the artist's declared lane
+ * @param {string} args.intentText text the emotion layer's semantic cues read
+ * @param {string} args.metaphorWords the artist's words handed to the metaphor stage
+ * @param {string|null} [args.declaredEmotionId] the artist's pick from the taxonomy
+ * @param {string} [args.lockedTechnique] skip technique selection (refine keeps the original look)
+ * @param {string} [args.contextFallback] metaphor context if no register can be built
+ */
+async function planCover({ features, genreLineage: lineage, intentText, metaphorWords, declaredEmotionId, lockedTechnique, contextFallback }) {
+  const kinetics = buildKinetics(features, lineage, intentText, declaredEmotionId)
+  // Audio-only register: context for the metaphor stage. Logged once, below,
+  // for the final read.
+  const audioRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, undefined, true)
+
+  const meta = await generateVisualMetaphors({
+    generate: geminiRawText,
+    userFeeling: metaphorWords,
+    context: audioRegister || contextFallback,
+    kinetics,
+  })
+
+  const technique = lockedTechnique || resolveTechnique(features, lineage, intentText, declaredEmotionId, meta.feeling)
+  // The register the scene writer sees also carries what the words are about.
+  const emotionalRegister = buildEmotionalRegister(features, lineage, intentText, declaredEmotionId, meta.feeling)
+  const sceneMode = resolveSubjectMode(deriveSceneMode(features), meta.hasPerson)
+
+  return { technique, metaphor: meta.metaphor, hasPerson: meta.hasPerson, feeling: meta.feeling, emotionalRegister, sceneMode }
+}
+
 function parseSceneResponse(rawText, fallbackScene) {
   const text = (rawText || '').trim()
   if (!text) return { scene: fallbackScene }
@@ -523,15 +571,18 @@ async function generateWithRetry(promptText, { maxRetries = 3, fallbackScene = '
 }
 
 async function synthesizeSceneBrief({ userInput, lyrics, sonicFeatures, artistContext, features }) {
-  const technique = resolveTechnique(features, null, userInput)
-  const { metaphor, hasPerson } = await generateVisualMetaphors({
-    generate: geminiRawText,
-    userFeeling: userInput,
-    context: sonicFeatures,
-    kinetics: buildKinetics(features, null, userInput),
+  const plan = await planCover({
+    features,
+    genreLineage: null,
+    intentText: userInput,
+    metaphorWords: userInput,
+    contextFallback: sonicFeatures,
   })
-  const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(features), hasPerson), technique, metaphor })}
-
+  const { technique, hasPerson, emotionalRegister } = plan
+  const promptText = `${aestheticSystemPrompt({ ...plan.sceneMode, technique, metaphor: plan.metaphor })}
+${emotionalRegister ? `── EMOTIONAL REGISTER (read this FIRST — it governs the whole frame) ──
+${emotionalRegister}
+` : ''}
 INPUT MATRIX TO CONVERT:
 1. Artist's Core Feeling / What The Song Is About: "${userInput.trim()}"
 2. Song Lyrics: "${lyrics || 'No lyrics available — treat as instrumental-leaning emotional content'}"
@@ -627,18 +678,18 @@ router.post('/expand', requireAuth, async (req, res) => {
 
     const artist = await fetchArtistProfile(userId);
     const audioContext = audioFeaturesToVisualDescription(upload.audio_features, artist.genreLineage);
-const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
-    const technique = resolveTechnique(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId)
-    const { metaphor, hasPerson } = await generateVisualMetaphors({
-      generate: geminiRawText,
-      userFeeling: basic_input,
-      context: emotionalRegister,
-      kinetics: buildKinetics(upload.audio_features, artist.genreLineage, basic_input, declaredEmotionId),
+    const plan = await planCover({
+      features: upload.audio_features,
+      genreLineage: artist.genreLineage,
+      intentText: basic_input,
+      metaphorWords: basic_input,
+      declaredEmotionId,
     })
+    const { technique, hasPerson, emotionalRegister } = plan
 
-    const promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
+    const promptText = `${aestheticSystemPrompt({ ...plan.sceneMode, technique, metaphor: plan.metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
-${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
+${emotionalRegister ? `── EMOTIONAL REGISTER (read this FIRST — it governs the whole frame) ──
 ${emotionalRegister}
 ` : ''}
 Artist input text: "${basic_input.trim()}"
@@ -796,51 +847,56 @@ router.post('/transcribe', requireAuth, async (req, res) => {
     }
 
 // ── STEP 3: Handle execution logic paths exactly like /expand ──
-    // Technique is locked once, from the audio + whatever text context exists
-    // so far — both branches below write a scene for the SAME technique.
-    const technique = resolveTechnique(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
+    // Technique is resolved inside planCover, once per branch and AFTER the
+    // metaphor stage, so the artist's words (not only the audio) inform it.
+    let technique
     let promptText = '';
     let resolvedHasPerson = null;
 
     if (!lyricsText || !lyricsText.trim()) {
       console.log(`[TRANSCRIPTION FALLBACK] Lyrics missing from all lookups for upload=${upload_id}. Activating direct prompt compiler match. Mode: VOCAL`);
 
-      const emotionalRegister = buildEmotionalRegister(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId)
-      const { metaphor, hasPerson } = await generateVisualMetaphors({
-        generate: geminiRawText,
-        userFeeling: userVibeInput,
-        context: emotionalRegister,
-        kinetics: buildKinetics(upload.audio_features, artist.genreLineage, userVibeInput, declaredEmotionId),
+      const plan = await planCover({
+        features: upload.audio_features,
+        genreLineage: artist.genreLineage,
+        intentText: userVibeInput,
+        metaphorWords: userVibeInput,
+        declaredEmotionId,
       })
-      promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson), technique, metaphor })}
+      technique = plan.technique
+      promptText = `${aestheticSystemPrompt({ ...plan.sceneMode, technique, metaphor: plan.metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
-${emotionalRegister ? `ââ EMOTIONAL REGISTER (read this FIRST â it governs the whole frame) ââ
-${emotionalRegister}
+${plan.emotionalRegister ? `── EMOTIONAL REGISTER (read this FIRST — it governs the whole frame) ──
+${plan.emotionalRegister}
 ` : ''}
 VOCAL CONTEXT RULE: This song contains VOCALS, not an instrumental track. Fully expand the user prompt below into a beautifully tailored visual representation matching a vocal track presence to avoid generic cover art layouts.
 Artist input text: "${userVibeInput.trim()}"
 Audio context variables: ${trackSonicFeatures}
 ${artist.contextLine ? `Artist Branding Space Context: ${artist.contextLine}` : ''}`;
-      resolvedHasPerson = hasPerson;
+      resolvedHasPerson = plan.hasPerson;
     } else {
       console.log(`[TRANSCRIPTION SUCCESS] Lyrics resolved via ${source}. Distilling structure.`);
       const distilledTheme = await distillLyricsToTheme(lyricsText, userVibeInput)
 
-      const emotionalRegister2 = buildEmotionalRegister(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId)
-      const { metaphor: metaphor2, hasPerson: hasPerson2 } = await generateVisualMetaphors({
-        generate: geminiRawText,
-        userFeeling: `${userVibeInput}. ${distilledTheme}`,
-        context: emotionalRegister2,
-        kinetics: buildKinetics(upload.audio_features, artist.genreLineage, `${userVibeInput} ${distilledTheme}`, declaredEmotionId),
+      const plan = await planCover({
+        features: upload.audio_features,
+        genreLineage: artist.genreLineage,
+        intentText: `${userVibeInput} ${distilledTheme}`,
+        metaphorWords: `${userVibeInput}. ${distilledTheme}`,
+        declaredEmotionId,
       })
-      promptText = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), hasPerson2), technique, metaphor: metaphor2 })}
+      technique = plan.technique
+      promptText = `${aestheticSystemPrompt({ ...plan.sceneMode, technique, metaphor: plan.metaphor })}
 ${artist.subjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${artist.subjectRule}\n` : ''}
+${plan.emotionalRegister ? `── EMOTIONAL REGISTER (read this FIRST — it governs the whole frame) ──
+${plan.emotionalRegister}
+` : ''}
 INPUT MATRIX TO CONVERT — the scene you write MUST depict what this song is about:
 1. Artist's Core Feeling: "${userVibeInput.trim()}"
 2. What This Song Is About (concrete brief distilled from the lyrics — stage THIS): "${distilledTheme}"
 3. Track Sonic Profile Features: ${trackSonicFeatures}
 ${artist.contextLine ? `4. Artist Branding Space Context: ${artist.contextLine}` : ''}`;
-      resolvedHasPerson = hasPerson2;
+      resolvedHasPerson = plan.hasPerson;
     }
 
     let scene
@@ -965,7 +1021,7 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    const { prompt: absoluteFluxPrompt, dna: promptDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+    const { dna: promptDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       // Same family the scene writer was briefed on, so the assembled
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
@@ -985,16 +1041,15 @@ router.post('/', requireAuth, async (req, res) => {
 
     console.log(`[IMAGE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline for ID: ${generationId} technique=${technique}`)
 
-    // Simplify the verbose aesthetic prompt into something image models can
-    // actually execute — short, subject-first, no 200 lines of reasoning.
-    const simplifiedPromptForModel = simplifyForImageModel({ scene, dna: promptDna, technique, fallbackPrompt: absoluteFluxPrompt, noPeople: artistNoPeople || resolvedHasPerson === false })
-    console.log(`[IMAGE-ENGINE] simplified prompt ready (${simplifiedPromptForModel.length} chars)`)
-    console.log(`[IMAGE-ENGINE] sample: "${simplifiedPromptForModel.substring(0, 150)}..."`)
+    // What the image model receives is composed from the parts (see engine/compose),
+    // not the verbose reasoning prompt — and it is what gets stored as prompt_used,
+    // so the database shows what was actually sent.
+    const imagePrompt = composeForImage({ scene, dna: promptDna, technique, noPeople: artistNoPeople || resolvedHasPerson === false })
 
     let imagePayloadUrl
     try {
       console.log(`[IMAGE-ENGINE] sending to ${DEFAULT_PROVIDER}...`)
-      imagePayloadUrl = await generateImage(simplifiedPromptForModel, {
+      imagePayloadUrl = await generateImage(imagePrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
         referenceImageB64: reference_image_b64 || undefined,
@@ -1030,7 +1085,7 @@ router.post('/', requireAuth, async (req, res) => {
         id: generationId,
         upload_id,
         user_id: userId,
-        prompt_used: absoluteFluxPrompt,
+        prompt_used: imagePrompt,
         technique,
         image_url: permanentUrl,
         status: 'complete',
@@ -1114,21 +1169,41 @@ router.patch('/refine', requireAuth, async (req, res) => {
 
     // Technique is locked to whatever the original generation used — refine
     // re-stages the same look, it never re-rolls the technique itself. If
-    // there's no prior structured brief, score it fresh from the audio.
+    // there's no prior structured brief, planCover scores it fresh.
     const existingBrief = deserializeBrief(upload.sentence_prompt, upload.audio_features)
-    const technique = (existingBrief && existingBrief.structured)
-      ? existingBrief.technique
-      : resolveTechnique(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest)
+    const refineLineage = genreLineage(refineProfile.default_genre)
+    const storedScene = existingBrief && existingBrief.structured ? String(existingBrief.scene || '').trim() : ''
 
-    const { metaphor: refineMetaphor, hasPerson: refineHasPerson } = await generateVisualMetaphors({
-      generate: geminiRawText,
-      userFeeling: modRequest || existingBrief?.scene || '',
-      context: trackSonicFeatures,
-      kinetics: buildKinetics(upload.audio_features, genreLineage(refineProfile.default_genre), modRequest || existingBrief?.scene || ''),
-    })
+    let technique
+    let scene
+    let refineHasPerson
+    if (modRequest && storedScene && modRequest === storedScene) {
+      // The tuning screen shows the artist an "expanded visual description", and
+      // /expand has already stored exactly that text as this upload's scene.
+      // Re-running the metaphor and scene writers on it would render a DIFFERENT
+      // scene from the one on screen (and spend two more Gemini calls of a
+      // 20/day quota). What the artist read is what gets rendered.
+      technique = existingBrief.technique
+      scene = storedScene
+      refineHasPerson = existingBrief.hasPerson
+      console.log('[REFINE] scene was already expanded and shown to the artist — rendering it as written, no rewrite')
+    } else {
+      const plan = await planCover({
+        features: upload.audio_features,
+        genreLineage: refineLineage,
+        intentText: modRequest || storedScene,
+        metaphorWords: modRequest || existingBrief?.scene || '',
+        lockedTechnique: existingBrief && existingBrief.structured ? existingBrief.technique : undefined,
+        contextFallback: trackSonicFeatures,
+      })
+      technique = plan.technique
+      refineHasPerson = plan.hasPerson
 
-    const refinementPrompt = `${aestheticSystemPrompt({ ...resolveSubjectMode(deriveSceneMode(upload.audio_features), refineHasPerson), technique, metaphor: refineMetaphor })}
+      const refinementPrompt = `${aestheticSystemPrompt({ ...plan.sceneMode, technique, metaphor: plan.metaphor })}
 ${refineSubjectRule ? `\nARTIST SUBJECT RULE (HARD CONSTRAINT — overrides every other instruction): ${refineSubjectRule}\n` : ''}
+${plan.emotionalRegister ? `── EMOTIONAL REGISTER (read this FIRST — it governs the whole frame) ──
+${plan.emotionalRegister}
+` : ''}
 You are refining an existing cover art brief${modRequest ? ' based on direct artist feedback' : ' by producing a fresh alternate take'} — the technique above is LOCKED; write a new staging that suits it.
 
 INPUT REFINEMENT VARIABLES:
@@ -1136,18 +1211,18 @@ INPUT REFINEMENT VARIABLES:
 2. Existing Brief: ${existingBrief?.scene || 'Baseline generation profile'}
 3. Underlying Track Sonic Signature: ${trackSonicFeatures}`;
 
-    const refineFallback = modRequest || existingBrief?.scene || 'Abstract intense emotion'
-    let scene
-    try {
-      ({ scene } = await generateSafeScene(refinementPrompt, {
-        fallbackScene: refineFallback,
-      }))
-    } catch (gErr) {
-      console.error(`⚠️ Refinement expansion fallback applied after retries: ${gErr?.message || gErr}`);
-      scene = refineFallback
+      const refineFallback = modRequest || existingBrief?.scene || 'Abstract intense emotion'
+      try {
+        ({ scene } = await generateSafeScene(refinementPrompt, {
+          fallbackScene: refineFallback,
+        }))
+      } catch (gErr) {
+        console.error(`⚠️ Refinement expansion fallback applied after retries: ${gErr?.message || gErr}`);
+        scene = refineFallback
+      }
     }
 
-    const { prompt: absoluteFluxRefinedPrompt, dna: refinedDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
+    const { dna: refinedDna } = await buildFinalPrompt(technique, scene, upload.audio_features, {
       // Same family the scene writer was briefed on, so the assembled
       // medium can never contradict the scene text.
       mediumFamily: deriveSceneMode(upload.audio_features).mediumFamily,
@@ -1166,15 +1241,13 @@ INPUT REFINEMENT VARIABLES:
 
     console.log(`[REFINE-ENGINE] Launching ${DEFAULT_PROVIDER} pipeline. ID: ${generationId} technique=${technique}`);
 
-    // Simplify the verbose aesthetic prompt (same as in POST / above).
-    const simplifiedRefinedPrompt = simplifyForImageModel({ scene, dna: refinedDna, technique, fallbackPrompt: absoluteFluxRefinedPrompt, noPeople: refineNoPeople || refineHasPerson === false })
-    console.log(`[REFINE-ENGINE] simplified prompt ready (${simplifiedRefinedPrompt.length} chars)`)
-    console.log(`[REFINE-ENGINE] sample: "${simplifiedRefinedPrompt.substring(0, 150)}..."`)
+    // Same composition as POST / above.
+    const imagePrompt = composeForImage({ scene, dna: refinedDna, technique, noPeople: refineNoPeople || refineHasPerson === false, label: 'REFINE-COMPOSE' })
 
     let imagePayloadUrl;
     try {
       console.log(`[REFINE-ENGINE] sending to ${DEFAULT_PROVIDER}...`)
-      imagePayloadUrl = await generateImage(simplifiedRefinedPrompt, {
+      imagePayloadUrl = await generateImage(imagePrompt, {
         width: 1024, height: 1024,
         referenceImageUrl: reference_image_url || undefined,
         referenceImageB64: reference_image_b64 || undefined,
@@ -1210,7 +1283,7 @@ INPUT REFINEMENT VARIABLES:
         id: generationId,
         upload_id,
         user_id: userId,
-        prompt_used: absoluteFluxRefinedPrompt,
+        prompt_used: imagePrompt,
         technique,
         image_url: permanentUrl,
         status: 'complete',

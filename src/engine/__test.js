@@ -25,6 +25,22 @@ function test(name, fn) {
   try { fn(); passed++ } catch (err) { failures.push(`${name}\n    ${err.message}`) }
 }
 
+// A technique is a photographic ACT (every suffix asserts a real capture), so by
+// default it is authoritative over medium: whatever family was requested, the
+// assembled medium is photographic. A technique may opt out by declaring
+// `allowsCGI` / `allowsIllustration`; none do today. These helpers opt one in
+// for the duration of a callback so the mechanism itself stays under test.
+function withNonPhotoAllowed(techniqueName, fn) {
+  const t = TECHNIQUES[techniqueName]
+  const before = { allowsCGI: t.allowsCGI, allowsIllustration: t.allowsIllustration }
+  t.allowsCGI = true
+  t.allowsIllustration = true
+  try { return fn() } finally {
+    t.allowsCGI = before.allowsCGI
+    t.allowsIllustration = before.allowsIllustration
+  }
+}
+
 const TRACK = {
   bpm: 140, energy: 85, valence: 25, danceability: 70, acousticness: 12,
   spectral_brightness: 62, speechiness: 45, loudness: -5, key: 'F', scale: 'minor', genre: 'drill',
@@ -298,10 +314,20 @@ const CGI_TRACK = {
 }
 const CGI_DSP = { sub_bass_ratio: 0.48, spectral_flatness: 0.10, spectral_flux: 0.4, onset_rate: 6 }
 
-test('CGI medium is reachable in its research territory', () => {
-  const dna = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP }, 'FLASH_DOCUMENTARY')
-  assert.strictEqual(dna.selections.artMedium.conceptId, 'medium_3d_cgi',
-    'sub-bass >0.40 with low flatness should reach the CGI medium')
+test('CGI medium is reachable in its research territory (for a technique that allows it)', () => {
+  withNonPhotoAllowed('FLASH_DOCUMENTARY', () => {
+    const dna = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP }, 'FLASH_DOCUMENTARY')
+    assert.strictEqual(dna.selections.artMedium.conceptId, 'medium_3d_cgi',
+      'sub-bass >0.40 with low flatness should reach the CGI medium')
+  })
+})
+
+test('a photographic technique is authoritative over medium — no CGI/illustration leaks into it', () => {
+  for (const t of Object.keys(TECHNIQUES)) {
+    const dna = computeVisualDNA({ ...CGI_TRACK, ...CGI_DSP }, t)
+    assert.strictEqual(mediumFamily(dna), 'photo',
+      `${t}: every current technique is a real capture; the medium must be photographic (got "${mediumFamily(dna)}")`)
+  }
 })
 
 test('CGI never hijacks an acoustic track that has no DSP data', () => {
@@ -500,10 +526,11 @@ test('calibration preserved the emotional ordering of the archetypes', () => {
 })
 
 // ── 15. Medium agreement between scene and assembly ───────────────────────
-// The scene is written BEFORE the technique is known, so it commits to a medium
-// family up front ("you write ONE rendered moment"). If per-technique scoring
-// then picked a different family, the prompt would describe a photograph and
-// label it a 3D render. The constraint below is what makes that impossible.
+// Medium and technique must never disagree in one prompt: a screen-print
+// declared to be "a real thermal-sensor capture" was a real generation. The
+// technique is now chosen BEFORE the scene, and every technique is a real
+// capture, so technique authority decides the family; a requested family only
+// applies to a technique that explicitly allows non-photographic mediums.
 test('computeVisualDNA honours a medium-family constraint', () => {
   const cgiTrack = {
     bpm: 130, energy: 82, valence: 50, danceability: 55, acousticness: 6,
@@ -512,9 +539,16 @@ test('computeVisualDNA honours a medium-family constraint', () => {
   }
   for (const family of ['photo', 'cgi', 'illustration']) {
     for (const t of Object.keys(TECHNIQUES)) {
-      const dna = computeVisualDNA(cgiTrack, t, { mediumFamily: family })
-      assert.strictEqual(mediumFamily(dna), family,
-        `${t}: asked for "${family}" but assembled "${mediumFamily(dna)}"`)
+      // The mechanism: a technique that allows non-photo mediums gets the family asked for.
+      withNonPhotoAllowed(t, () => {
+        const dna = computeVisualDNA(cgiTrack, t, { mediumFamily: family })
+        assert.strictEqual(mediumFamily(dna), family,
+          `${t}: asked for "${family}" but assembled "${mediumFamily(dna)}"`)
+      })
+      // The contract: with no opt-in, technique authority wins over any request.
+      const locked = computeVisualDNA(cgiTrack, t, { mediumFamily: family })
+      assert.strictEqual(mediumFamily(locked), 'photo',
+        `${t}: a photographic technique must not assemble "${mediumFamily(locked)}" when "${family}" is requested`)
     }
   }
 })
